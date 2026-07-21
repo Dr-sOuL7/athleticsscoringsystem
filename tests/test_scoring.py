@@ -16,7 +16,7 @@ from athletics_scoring.performance import (
     PerformanceParseError,
     parse_performance,
 )
-from athletics_scoring.scorer import ScoringEngine
+from athletics_scoring.scorer import ScoringEngine, aggregate_by_athlete
 from athletics_scoring.tables import EventTable, ScoringTables
 from athletics_scoring.events import PerformanceType
 from athletics_scoring.timing import TimingMethod, to_fat_equivalent
@@ -143,6 +143,45 @@ class TestScoringEngine(unittest.TestCase):
     def test_women_event_selected_by_gender(self):
         row = _perf(gender="Female", event_name="100m", result="11.90")
         self.assertEqual(self.engine.score_one(row).score, 1011)
+
+
+class TestAthleteAggregation(unittest.TestCase):
+    def setUp(self):
+        self.engine = ScoringEngine(_TABLES)
+
+    def test_scores_are_summed_per_athlete(self):
+        rows = [
+            _perf(name="Multi", athlete_id="A1", event_name="100m", result="10.87"),
+            _perf(name="Multi", athlete_id="A1", event_name="Long Jump",
+                  performance_type="DISTANCE", result="7.10"),
+        ]
+        report = self.engine.score_all(rows)
+        aggregates = aggregate_by_athlete(report)
+        self.assertEqual(len(aggregates), 1)
+        agg = aggregates[0]
+        self.assertEqual(agg.event_count, 2)
+        self.assertEqual(agg.total_score, sum(r.score for r in report.scored))
+
+    def test_distinct_athletes_grouped_by_name_id_college(self):
+        rows = [
+            _perf(name="Same", athlete_id="1", college="A", result="10.87"),
+            _perf(name="Same", athlete_id="1", college="A", result="11.00"),
+            _perf(name="Same", athlete_id="2", college="A", result="10.90"),
+        ]
+        aggregates = aggregate_by_athlete(self.engine.score_all(rows))
+        # Two distinct ids -> two athletes; grouping is case/space-insensitive.
+        self.assertEqual(len(aggregates), 2)
+
+    def test_sorted_by_total_descending(self):
+        rows = [
+            _perf(name="Solo", athlete_id="S", result="12.00"),
+            _perf(name="Multi", athlete_id="M", result="12.00"),
+            _perf(name="Multi", athlete_id="M", event_name="Long Jump",
+                  performance_type="DISTANCE", result="7.00"),
+        ]
+        aggregates = aggregate_by_athlete(self.engine.score_all(rows))
+        self.assertEqual(aggregates[0].name, "Multi")  # summed two events
+        self.assertGreater(aggregates[0].total_score, aggregates[1].total_score)
 
 
 class TestBundledDataIntegrity(unittest.TestCase):

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from athletics_scoring.loader import InputLoader, LoaderError
 from athletics_scoring.logging_config import configure_logging
-from athletics_scoring.scorer import ScoringEngine
+from athletics_scoring.scorer import ScoringEngine, aggregate_by_athlete
 from athletics_scoring.tables import ScoringTables
 from athletics_scoring.validator import ValidationError
 from athletics_scoring.writer import ExcelWriter
@@ -48,6 +48,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tables",
         default=None,
         help="Path to scoring_tables.json (default: bundled table).",
+    )
+    parser.add_argument(
+        "--no-details",
+        action="store_true",
+        help="Do not add a 'Details' sheet breaking down each performance.",
     )
     parser.add_argument(
         "--no-rejects",
@@ -101,10 +106,12 @@ def run(argv: list[str]) -> int:
         return 2
     _LOG.info("Athletes read   : %d", len(performances))
 
-    # 3) Score.
+    # 3) Score, then aggregate per athlete (sum of event scores).
     engine = ScoringEngine(tables)
     report = engine.score_all(performances)
+    aggregates = aggregate_by_athlete(report)
     _LOG.info("Scored records  : %d", len(report.scored))
+    _LOG.info("Distinct athletes: %d", len(aggregates))
     _LOG.info("Invalid records : %d", len(report.rejected))
     for reject in report.rejected:
         _LOG.warning("  Row %s rejected: %s", reject.row_number, reject.reason)
@@ -112,7 +119,11 @@ def run(argv: list[str]) -> int:
     # 4) Write output.
     writer = ExcelWriter()
     written = writer.write(
-        report, output_path, include_rejects=not args.no_rejects
+        aggregates,
+        report,
+        output_path,
+        include_details=not args.no_details,
+        include_rejects=not args.no_rejects,
     )
     _LOG.info("Output file     : %s", written)
 
@@ -121,8 +132,8 @@ def run(argv: list[str]) -> int:
     _LOG.info("=== Athletics scoring run finished ===")
 
     print(
-        f"Done: {len(report.scored)} scored, {len(report.rejected)} rejected -> "
-        f"{written} ({elapsed:.3f}s)"
+        f"Done: {len(aggregates)} athletes ({len(report.scored)} performances), "
+        f"{len(report.rejected)} rejected -> {written} ({elapsed:.3f}s)"
     )
     return 0
 

@@ -33,6 +33,11 @@ _ROWS: list[tuple] = [
     ("Pooja Desai",     "W008", "Christ University",   "Female", "Javelin Throw",  "DISTANCE", "52.35"),
     ("Isha Kapoor",     "W009", "Fergusson College",   "Female", "High Jump",      "DISTANCE", "1.82"),
     ("Tanvi Rao",       "W010", "St. Xavier's",        "Female", "1500m",          "TIME",     "4:15.60"),
+    # --- Multi-event athletes (same NAME+ID+COLLEGE -> scores summed) -------
+    ("Aarav Sharma",    "M001", "Fergusson College",   "Male",   "Long Jump",      "DISTANCE", "7.10"),
+    ("Aarav Sharma",    "M001", "Fergusson College",   "Male",   "200m",           "TIME",     "21.90"),
+    ("Priya Menon",     "W001", "Fergusson College",   "Female", "200m",           "TIME",     "24.10"),
+    ("Priya Menon",     "W001", "Fergusson College",   "Female", "Long Jump",      "DISTANCE", "5.95"),
     # --- Deliberately invalid rows (to be skipped and reported) -------------
     ("Bad Event",       "X001", "Unknown College",     "Male",   "Tug of War",     "DISTANCE", "5.00"),
     ("Bad Result",      "X002", "Unknown College",     "Female", "100m",           "TIME",     "not-a-time"),

@@ -22,7 +22,12 @@ INPUT_COLUMNS: tuple[str, ...] = (
     "RESULT",
 )
 
+# Per-performance (detailed) output layout.
 OUTPUT_COLUMNS: tuple[str, ...] = INPUT_COLUMNS + ("SCORE",)
+
+# Aggregated, one-row-per-athlete output layout.  Athletes are identified by
+# the composite key (NAME, ID, COLLEGE); GENDER and SCORE are reported columns.
+AGGREGATE_COLUMNS: tuple[str, ...] = ("NAME", "ID", "COLLEGE", "GENDER", "SCORE")
 
 
 @dataclass(slots=True)
@@ -72,6 +77,47 @@ class ScoredResult:
             "PERFORMANCE TYPE": p.performance_type,
             "RESULT": p.result,
             "SCORE": self.score,
+        }
+
+
+@dataclass(slots=True)
+class AthleteAggregate:
+    """All performances of one athlete, collapsed to a single scored row.
+
+    Athletes are identified by the composite primary key (NAME, ID, COLLEGE).
+    The ``total_score`` is the sum of the World Athletics points earned across
+    every one of the athlete's valid entries.
+
+    Attributes:
+        name: Athlete's name (from the first entry seen).
+        athlete_id: Athlete's id (from the first entry seen).
+        college: Athlete's college (from the first entry seen).
+        gender: Athlete's gender (from the first entry seen).
+        total_score: Sum of scores across ``results``.
+        results: The individual scored performances that make up the total,
+            ordered from highest to lowest event score.
+    """
+
+    name: str
+    athlete_id: str
+    college: str
+    gender: str
+    total_score: int
+    results: list[ScoredResult] = field(default_factory=list)
+
+    @property
+    def event_count(self) -> int:
+        """Number of scored events contributing to the total."""
+        return len(self.results)
+
+    def as_output_row(self) -> dict[str, object]:
+        """Return the aggregated row as an ordered mapping for the writer."""
+        return {
+            "NAME": self.name,
+            "ID": self.athlete_id,
+            "COLLEGE": self.college,
+            "GENDER": self.gender,
+            "SCORE": self.total_score,
         }
 
 

@@ -3,7 +3,12 @@
 A production-quality Python application that scores athletics performances using
 the **official World Athletics Scoring Tables (2025 edition)**. It reads an
 Excel or CSV file of athletes' results, computes each athlete's World Athletics
-points, and writes a formatted Excel file sorted from highest score to lowest.
+points, and writes a formatted Excel file with **one row per athlete**, sorted
+from highest total score to lowest.
+
+Athletes are identified by the composite key **(NAME, ID, COLLEGE)**. A single
+athlete may appear in the input many times (one row per event); the system sums
+their World Athletics points across all events into a single total score.
 
 ---
 
@@ -121,12 +126,24 @@ python main.py INPUT.xlsx \
 
 ### Output
 
-An `.xlsx` workbook with a **Results** sheet containing:
+An `.xlsx` workbook with up to three sheets:
 
-`RANK · NAME · ID · COLLEGE · GENDER · EVENT NAME · PERFORMANCE TYPE · RESULT · SCORE`
+- **Results** — one row per athlete, sorted by descending total `SCORE`:
 
-sorted by descending `SCORE`. When any rows are rejected, a **Rejected** sheet
-lists each one with the reason.
+  `RANK · NAME · ID · COLLEGE · GENDER · SCORE`
+
+  where `SCORE` is the sum of the athlete's World Athletics points across every
+  event they entered.
+
+- **Details** — the per-performance breakdown behind each total, grouped under
+  the athlete (highest-scoring event first):
+
+  `RANK · NAME · ID · COLLEGE · GENDER · EVENT NAME · PERFORMANCE TYPE · RESULT · SCORE`
+
+  (omit with `--no-details`.)
+
+- **Rejected** — every skipped input row and the reason it was excluded
+  (only present when rows are rejected; omit with `--no-rejects`).
 
 ---
 
