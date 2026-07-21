@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Logs generated at runtime
+logs/
+*.log
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp

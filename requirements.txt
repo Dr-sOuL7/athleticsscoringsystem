@@ -1,0 +1,7 @@
+# Runtime dependencies for the Inter-College Athletics scoring system.
+# Only openpyxl is required; pandas is intentionally avoided to keep the
+# footprint small and start-up fast.
+openpyxl>=3.1,<4.0
+
+# --- Development / testing (optional) ---------------------------------------
+# pytest>=8.0
