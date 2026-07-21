@@ -21,12 +21,15 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from athletics_scoring.models import (
     AGGREGATE_COLUMNS,
+    COLLEGE_COLUMNS,
     OUTPUT_COLUMNS,
     AthleteAggregate,
+    CollegeRanking,
     ScoringReport,
 )
 
 _HEADER_FILL = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+_COLLEGE_FILL = PatternFill(start_color="6A1B9A", end_color="6A1B9A", fill_type="solid")
 _DETAIL_FILL = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
 _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _REJECT_FILL = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
@@ -40,6 +43,7 @@ class ExcelWriter:
         aggregates: list[AthleteAggregate],
         report: ScoringReport,
         path: Path | str,
+        colleges: list[CollegeRanking] | None = None,
         include_details: bool = True,
         include_rejects: bool = True,
     ) -> Path:
@@ -51,6 +55,8 @@ class ExcelWriter:
             report: The full scoring report (used for the Details and Rejected
                 sheets).
             path: Destination ``.xlsx`` path.
+            colleges: Optional college ranking; when provided, a
+                'College Ranking' sheet is added.
             include_details: When ``True``, add a per-performance Details sheet.
             include_rejects: When ``True`` and rejects exist, add a Rejected
                 sheet.
@@ -62,6 +68,10 @@ class ExcelWriter:
         results_sheet = workbook.active
         results_sheet.title = "Results"
         self._write_results(results_sheet, aggregates)
+
+        if colleges:
+            college_sheet = workbook.create_sheet("College Ranking")
+            self._write_colleges(college_sheet, colleges)
 
         if include_details:
             detail_sheet = workbook.create_sheet("Details")
@@ -87,6 +97,19 @@ class ExcelWriter:
             row = aggregate.as_output_row()
             sheet.append([rank] + [row[col] for col in AGGREGATE_COLUMNS])
         self._style_header(sheet, len(headers), _HEADER_FILL)
+        self._autofit(sheet, headers)
+        sheet.freeze_panes = "A2"
+
+    def _write_colleges(
+        self, sheet: Worksheet, colleges: list[CollegeRanking]
+    ) -> None:
+        """Write the college team-ranking sheet (one row per college)."""
+        headers = ("RANK",) + COLLEGE_COLUMNS
+        sheet.append(list(headers))
+        for rank, college in enumerate(colleges, start=1):
+            row = college.as_output_row()
+            sheet.append([rank] + [row[col] for col in COLLEGE_COLUMNS])
+        self._style_header(sheet, len(headers), _COLLEGE_FILL)
         self._autofit(sheet, headers)
         sheet.freeze_panes = "A2"
 

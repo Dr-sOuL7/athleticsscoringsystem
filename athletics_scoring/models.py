@@ -29,6 +29,9 @@ OUTPUT_COLUMNS: tuple[str, ...] = INPUT_COLUMNS + ("SCORE",)
 # the composite key (NAME, ID, COLLEGE); GENDER and SCORE are reported columns.
 AGGREGATE_COLUMNS: tuple[str, ...] = ("NAME", "ID", "COLLEGE", "GENDER", "SCORE")
 
+# College-ranking output layout (one row per college).
+COLLEGE_COLUMNS: tuple[str, ...] = ("COLLEGE", "ATHLETES", "SCORE")
+
 
 @dataclass(slots=True)
 class AthletePerformance:
@@ -117,6 +120,34 @@ class AthleteAggregate:
             "ID": self.athlete_id,
             "COLLEGE": self.college,
             "GENDER": self.gender,
+            "SCORE": self.total_score,
+        }
+
+
+@dataclass(slots=True)
+class CollegeRanking:
+    """A college's team standing, summed from its athletes' totals.
+
+    Attributes:
+        college: College / team name (from the first athlete seen).
+        total_score: Sum of every member athlete's total score.
+        athletes: The member athletes, ordered highest total first.
+    """
+
+    college: str
+    total_score: int
+    athletes: list["AthleteAggregate"] = field(default_factory=list)
+
+    @property
+    def athlete_count(self) -> int:
+        """Number of scoring athletes representing the college."""
+        return len(self.athletes)
+
+    def as_output_row(self) -> dict[str, object]:
+        """Return the college row as an ordered mapping for the writer."""
+        return {
+            "COLLEGE": self.college,
+            "ATHLETES": self.athlete_count,
             "SCORE": self.total_score,
         }
 

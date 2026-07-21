@@ -23,7 +23,11 @@ from pathlib import Path
 
 from athletics_scoring.loader import InputLoader, LoaderError
 from athletics_scoring.logging_config import configure_logging
-from athletics_scoring.scorer import ScoringEngine, aggregate_by_athlete
+from athletics_scoring.scorer import (
+    ScoringEngine,
+    aggregate_by_athlete,
+    rank_colleges,
+)
 from athletics_scoring.tables import ScoringTables
 from athletics_scoring.validator import ValidationError
 from athletics_scoring.writer import ExcelWriter
@@ -48,6 +52,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tables",
         default=None,
         help="Path to scoring_tables.json (default: bundled table).",
+    )
+    parser.add_argument(
+        "--no-colleges",
+        action="store_true",
+        help="Do not add a 'College Ranking' sheet.",
     )
     parser.add_argument(
         "--no-details",
@@ -106,12 +115,14 @@ def run(argv: list[str]) -> int:
         return 2
     _LOG.info("Athletes read   : %d", len(performances))
 
-    # 3) Score, then aggregate per athlete (sum of event scores).
+    # 3) Score, aggregate per athlete (sum of event scores), rank colleges.
     engine = ScoringEngine(tables)
     report = engine.score_all(performances)
     aggregates = aggregate_by_athlete(report)
+    colleges = rank_colleges(aggregates)
     _LOG.info("Scored records  : %d", len(report.scored))
     _LOG.info("Distinct athletes: %d", len(aggregates))
+    _LOG.info("Colleges        : %d", len(colleges))
     _LOG.info("Invalid records : %d", len(report.rejected))
     for reject in report.rejected:
         _LOG.warning("  Row %s rejected: %s", reject.row_number, reject.reason)
@@ -122,6 +133,7 @@ def run(argv: list[str]) -> int:
         aggregates,
         report,
         output_path,
+        colleges=None if args.no_colleges else colleges,
         include_details=not args.no_details,
         include_rejects=not args.no_rejects,
     )

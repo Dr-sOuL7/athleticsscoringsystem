@@ -16,7 +16,11 @@ from athletics_scoring.performance import (
     PerformanceParseError,
     parse_performance,
 )
-from athletics_scoring.scorer import ScoringEngine, aggregate_by_athlete
+from athletics_scoring.scorer import (
+    ScoringEngine,
+    aggregate_by_athlete,
+    rank_colleges,
+)
 from athletics_scoring.tables import EventTable, ScoringTables
 from athletics_scoring.events import PerformanceType
 from athletics_scoring.timing import TimingMethod, to_fat_equivalent
@@ -182,6 +186,36 @@ class TestAthleteAggregation(unittest.TestCase):
         aggregates = aggregate_by_athlete(self.engine.score_all(rows))
         self.assertEqual(aggregates[0].name, "Multi")  # summed two events
         self.assertGreater(aggregates[0].total_score, aggregates[1].total_score)
+
+
+class TestCollegeRanking(unittest.TestCase):
+    def setUp(self):
+        self.engine = ScoringEngine(_TABLES)
+
+    def test_college_score_is_sum_of_athletes(self):
+        rows = [
+            _perf(name="A", athlete_id="1", college="Red", result="10.87"),
+            _perf(name="B", athlete_id="2", college="Red", result="11.50"),
+            _perf(name="C", athlete_id="3", college="Blue", result="10.50"),
+        ]
+        aggregates = aggregate_by_athlete(self.engine.score_all(rows))
+        colleges = rank_colleges(aggregates)
+        by_name = {c.college: c for c in colleges}
+        red_total = sum(a.total_score for a in aggregates if a.college == "Red")
+        self.assertEqual(by_name["Red"].total_score, red_total)
+        self.assertEqual(by_name["Red"].athlete_count, 2)
+
+    def test_colleges_sorted_descending(self):
+        rows = [
+            _perf(name="A", athlete_id="1", college="Strong", result="10.00"),
+            _perf(name="B", athlete_id="2", college="Strong", result="10.20"),
+            _perf(name="C", athlete_id="3", college="Weak", result="14.00"),
+        ]
+        colleges = rank_colleges(
+            aggregate_by_athlete(self.engine.score_all(rows))
+        )
+        self.assertEqual(colleges[0].college, "Strong")
+        self.assertGreater(colleges[0].total_score, colleges[1].total_score)
 
 
 class TestBundledDataIntegrity(unittest.TestCase):

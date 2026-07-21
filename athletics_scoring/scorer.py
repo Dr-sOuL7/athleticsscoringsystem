@@ -18,6 +18,7 @@ from athletics_scoring.events import EventRegistry
 from athletics_scoring.models import (
     AthleteAggregate,
     AthletePerformance,
+    CollegeRanking,
     RejectedRecord,
     ScoredResult,
     ScoringReport,
@@ -81,6 +82,41 @@ def aggregate_by_athlete(report: ScoringReport) -> list[AthleteAggregate]:
         key=lambda a: (-a.total_score, a.name.lower(), str(a.athlete_id))
     )
     return aggregates
+
+
+def rank_colleges(aggregates: list[AthleteAggregate]) -> list[CollegeRanking]:
+    """Rank colleges by the summed total score of their athletes.
+
+    Each college's score is the sum of every member athlete's total score, so
+    the college table is a direct roll-up of the per-athlete Results table.
+    Colleges are grouped case/whitespace-insensitively and sorted by descending
+    score, ties broken by college name for reproducibility.
+
+    Args:
+        aggregates: Per-athlete aggregates (as produced by
+            :func:`aggregate_by_athlete`).
+
+    Returns:
+        One :class:`CollegeRanking` per distinct college.
+    """
+    grouped: dict[str, CollegeRanking] = {}
+    for athlete in aggregates:
+        key = " ".join(athlete.college.split()).lower()
+        college = grouped.get(key)
+        if college is None:
+            college = CollegeRanking(
+                college=athlete.college, total_score=0, athletes=[]
+            )
+            grouped[key] = college
+        college.total_score += athlete.total_score
+        college.athletes.append(athlete)
+
+    colleges = list(grouped.values())
+    for college in colleges:
+        college.athletes.sort(key=lambda a: -a.total_score)
+
+    colleges.sort(key=lambda c: (-c.total_score, c.college.lower()))
+    return colleges
 
 
 class ScoringEngine:

@@ -135,6 +135,14 @@ An `.xlsx` workbook with up to three sheets:
   where `SCORE` is the sum of the athlete's World Athletics points across every
   event they entered.
 
+- **College Ranking** — one row per college, sorted by descending team `SCORE`:
+
+  `RANK · COLLEGE · ATHLETES · SCORE`
+
+  where team `SCORE` is the sum of every member athlete's total score and
+  `ATHLETES` is how many scoring athletes the college fielded (omit with
+  `--no-colleges`).
+
 - **Details** — the per-performance breakdown behind each total, grouped under
   the athlete (highest-scoring event first):
 
@@ -202,9 +210,10 @@ single `O(log n)` binary search — no per-athlete linear scans.
 
 The design leaves clear seams for planned features:
 
-- **Team scoring / college ranking** — `COLLEGE` is carried through every model;
-  aggregate `ScoredResult.score` per college.
-- **Best Athlete Award** — pick the maximum score per athlete id.
+- **Team scoring / college ranking** — implemented: `rank_colleges()` sums each
+  college's athlete totals into the *College Ranking* sheet.
+- **Best Athlete Award** — the top row of the aggregated Results sheet; or pick
+  the maximum `AthleteAggregate.total_score`.
 - **Medal tally** — group scored results by event and take the top three.
 - **Meet records** — compare each scored mark against a stored records table.
 - **Hand timing** — already implemented in `timing.py`; enable via the `TIMING`
