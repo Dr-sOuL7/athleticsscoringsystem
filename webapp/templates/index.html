@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Athletics Meet Scorer — Upload results{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Score your athletics meet in seconds</h1>
+  <p class="lede">
+    Upload a spreadsheet of athlete performances and get official World Athletics
+    points, athlete rankings and college standings — ready to download as Excel.
+  </p>
+</section>
+
+<section class="card upload-card">
+  <form class="upload-form" method="post"
+        action="{{ url_for('routes.score') }}"
+        enctype="multipart/form-data">
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" name="file"
+             accept=".csv,.xlsx,.xlsm" required>
+      <span class="dropzone-icon">📄</span>
+      <span class="dropzone-text" id="dropzone-text">
+        <strong>Choose a file</strong> or drag it here
+      </span>
+      <span class="dropzone-hint">Accepted: .xlsx, .csv &nbsp;·&nbsp; up to {{ max_mb }} MB</span>
+    </label>
+
+    <div class="upload-actions">
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        Score results
+      </button>
+      <a class="btn btn-ghost" href="{{ url_for('routes.example') }}">
+        Try the example file
+      </a>
+    </div>
+  </form>
+</section>
+
+<section class="info-grid">
+  <div class="card info-card">
+    <h2>Required columns</h2>
+    <p>Your file's first row must contain these headers:</p>
+    <ul class="pill-list">
+      <li>NAME</li><li>ID</li><li>COLLEGE</li><li>GENDER</li>
+      <li>EVENT NAME</li><li>PERFORMANCE TYPE</li><li>RESULT</li>
+    </ul>
+    <p class="muted">An optional <code>TIMING</code> column (<code>FAT</code>/<code>HAND</code>) is supported.</p>
+  </div>
+
+  <div class="card info-card">
+    <h2>What you'll get</h2>
+    <ul class="check-list">
+      <li>Athlete ranking (scores summed per athlete)</li>
+      <li>College team ranking</li>
+      <li>Clear list of any rejected rows</li>
+      <li>A formatted Excel download</li>
+    </ul>
+  </div>
+
+  <div class="card info-card">
+    <h2>Result formats</h2>
+    <table class="mini-table">
+      <tr><td><code>10.87</code></td><td>seconds</td></tr>
+      <tr><td><code>2:05.31</code></td><td>min:sec</td></tr>
+      <tr><td><code>6.72</code></td><td>metres</td></tr>
+    </table>
+    <p class="muted">Events accept friendly names (<code>Long Jump</code>) or codes (<code>LJ</code>).</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

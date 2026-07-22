@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Results — Athletics Meet Scorer{% endblock %}
+
+{% macro medal(rank) -%}
+  {%- if rank == 1 -%}🥇{%- elif rank == 2 -%}🥈{%- elif rank == 3 -%}🥉{%- else -%}{{ rank }}{%- endif -%}
+{%- endmacro %}
+
+{% macro cap_note(shown, total) -%}
+  {% if total > shown %}
+    <p class="muted cap-note">Showing the first {{ shown }} of {{ total }} rows —
+      the complete data is in the Excel download.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<section class="results-head">
+  <div>
+    <h1>Results</h1>
+    <p class="muted">
+      From <strong>{{ outcome.source_filename }}</strong> ·
+      processed in {{ '%.2f'|format(outcome.elapsed_seconds) }}s
+    </p>
+  </div>
+  <div class="results-actions">
+    <a class="btn btn-primary" href="{{ url_for('routes.download', token=token) }}">
+      ⬇ Download Excel
+    </a>
+    <a class="btn btn-ghost" href="{{ url_for('routes.index') }}">Score another file</a>
+  </div>
+</section>
+
+<section class="stat-row">
+  <div class="stat">
+    <span class="stat-value">{{ outcome.athlete_count }}</span>
+    <span class="stat-label">Athletes</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ outcome.performance_count }}</span>
+    <span class="stat-label">Performances</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ outcome.college_count }}</span>
+    <span class="stat-label">Colleges</span>
+  </div>
+  <div class="stat {{ 'stat-warn' if outcome.rejected_count else '' }}">
+    <span class="stat-value">{{ outcome.rejected_count }}</span>
+    <span class="stat-label">Rejected rows</span>
+  </div>
+</section>
+
+<div class="tabs" data-tabs>
+  <div class="tab-bar" role="tablist">
+    <button class="tab-btn is-active" data-tab="athletes" role="tab">Athlete ranking</button>
+    <button class="tab-btn" data-tab="colleges" role="tab">College ranking</button>
+    <button class="tab-btn" data-tab="details" role="tab">Details</button>
+    {% if outcome.rejected_count %}
+    <button class="tab-btn tab-btn-warn" data-tab="rejected" role="tab">
+      Rejected ({{ outcome.rejected_count }})
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Athletes -->
+  <section class="tab-panel is-active" data-panel="athletes">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Rank</th><th>Name</th><th>ID</th><th>College</th>
+              <th>Gender</th><th class="num">Events</th><th class="num">Score</th></tr>
+        </thead>
+        <tbody>
+          {% for row in outcome.athletes[:preview] %}
+          <tr class="{{ 'top-row' if row['RANK'] <= 3 }}">
+            <td class="rank">{{ medal(row['RANK']) }}</td>
+            <td>{{ row['NAME'] }}</td>
+            <td>{{ row['ID'] }}</td>
+            <td>{{ row['COLLEGE'] }}</td>
+            <td>{{ row['GENDER'] }}</td>
+            <td class="num">{{ row['EVENTS'] }}</td>
+            <td class="num score">{{ row['SCORE'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ cap_note(outcome.athletes[:preview]|length, outcome.athlete_count) }}
+  </section>
+
+  <!-- Colleges -->
+  <section class="tab-panel" data-panel="colleges">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Rank</th><th>College</th>
+              <th class="num">Athletes</th><th class="num">Score</th></tr>
+        </thead>
+        <tbody>
+          {% for row in outcome.colleges[:preview] %}
+          <tr class="{{ 'top-row' if row['RANK'] <= 3 }}">
+            <td class="rank">{{ medal(row['RANK']) }}</td>
+            <td>{{ row['COLLEGE'] }}</td>
+            <td class="num">{{ row['ATHLETES'] }}</td>
+            <td class="num score">{{ row['SCORE'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ cap_note(outcome.colleges[:preview]|length, outcome.college_count) }}
+  </section>
+
+  <!-- Details -->
+  <section class="tab-panel" data-panel="details">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name</th><th>ID</th><th>College</th><th>Gender</th>
+              <th>Event</th><th>Type</th><th>Result</th><th class="num">Score</th></tr>
+        </thead>
+        <tbody>
+          {% for row in outcome.details[:preview] %}
+          <tr>
+            <td>{{ row['NAME'] }}</td>
+            <td>{{ row['ID'] }}</td>
+            <td>{{ row['COLLEGE'] }}</td>
+            <td>{{ row['GENDER'] }}</td>
+            <td>{{ row['EVENT NAME'] }}</td>
+            <td>{{ row['PERFORMANCE TYPE'] }}</td>
+            <td>{{ row['RESULT'] }}</td>
+            <td class="num score">{{ row['SCORE'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ cap_note(outcome.details[:preview]|length, outcome.performance_count) }}
+  </section>
+
+  <!-- Rejected -->
+  {% if outcome.rejected_count %}
+  <section class="tab-panel" data-panel="rejected">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Row</th><th>Name</th><th>Event</th>
+              <th>Result</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          {% for row in outcome.rejected[:preview] %}
+          <tr>
+            <td class="num">{{ row['ROW'] }}</td>
+            <td>{{ row['NAME'] }}</td>
+            <td>{{ row['EVENT NAME'] }}</td>
+            <td>{{ row['RESULT'] }}</td>
+            <td class="reason">{{ row['REASON'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ cap_note(outcome.rejected[:preview]|length, outcome.rejected_count) }}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
