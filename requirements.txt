@@ -1,7 +1,14 @@
-# Runtime dependencies for the Inter-College Athletics scoring system.
-# Only openpyxl is required; pandas is intentionally avoided to keep the
-# footprint small and start-up fast.
+# Dependencies for the Inter-College Athletics scoring system.
+
+# --- Scoring engine (core) --------------------------------------------------
+# Only openpyxl is required by the engine; pandas is intentionally avoided to
+# keep the footprint small and start-up fast.
 openpyxl>=3.1,<4.0
+
+# --- Web application --------------------------------------------------------
+Flask>=3.0,<4.0
+# Production WSGI server that works cross-platform (incl. Windows).
+waitress>=3.0,<4.0
 
 # --- Development / testing (optional) ---------------------------------------
 # pytest>=8.0
