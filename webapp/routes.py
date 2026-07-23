@@ -1,14 +1,19 @@
 """HTTP routes for the athletics scoring web app.
 
 The blueprint is intentionally thin: it validates the request, delegates all
-real work to :class:`webapp.service.ScoringService`, stashes the generated
-workbook in the download cache, and renders templates.  No scoring logic lives
-here.
+real work to :class:`webapp.service.ScoringService`, and renders templates.
+No scoring logic lives here.
+
+The download is **single-request and stateless**: the generated workbook is
+embedded in the results page as a base64 ``data:`` link, so no server-side
+state is kept between requests.  This makes the app safe to run on stateless
+serverless platforms (e.g. Vercel), where a follow-up request may land on a
+different instance.
 """
 
 from __future__ import annotations
 
-import io
+import base64
 import logging
 from pathlib import Path
 
@@ -19,7 +24,6 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
 from werkzeug.utils import secure_filename
@@ -39,11 +43,6 @@ _EXAMPLE_MAPPING_PATH = _EXAMPLES_DIR / "example_mapping.xlsx"
 def _service() -> ScoringService:
     """Return the shared scoring service from the app context."""
     return current_app.extensions["ascore_service"]
-
-
-def _cache():
-    """Return the shared download cache from the app context."""
-    return current_app.extensions["ascore_cache"]
 
 
 def _config():
@@ -66,15 +65,24 @@ def _allowed(filename: str) -> bool:
     return Path(filename).suffix.lower() in _config().allowed_extensions
 
 
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
 def _render_outcome(outcome) -> str:
-    """Cache the workbook and render the results page for *outcome*."""
+    """Render the results page with the workbook embedded for download.
+
+    The ``.xlsx`` is base64-encoded into a ``data:`` URI so the browser can save
+    it without a second request — no server-side state is retained.
+    """
     stem = Path(secure_filename(outcome.source_filename) or "results").stem
     download_name = f"{stem}_scored.xlsx"
-    token = _cache().put(download_name, outcome.workbook_bytes)
+    b64 = base64.b64encode(outcome.workbook_bytes).decode("ascii")
+    download_uri = f"data:{_XLSX_MIME};base64,{b64}"
     return render_template(
         "results.html",
         outcome=outcome,
-        token=token,
+        download_uri=download_uri,
+        download_name=download_name,
         preview=_config().max_preview_rows,
     )
 
@@ -176,27 +184,6 @@ def example():
         flash(str(exc), "error")
         return redirect(url_for("routes.index"))
     return _render_outcome(outcome)
-
-
-@bp.get("/download/<token>")
-def download(token: str):
-    """Serve a previously generated workbook by its one-time token."""
-    item = _cache().get(token)
-    if item is None:
-        flash(
-            "That download link has expired. Please score the file again.",
-            "warning",
-        )
-        return redirect(url_for("routes.index"))
-    filename, data = item
-    return send_file(
-        io.BytesIO(data),
-        mimetype=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-        as_attachment=True,
-        download_name=filename,
-    )
 
 
 @bp.app_errorhandler(413)

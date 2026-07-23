@@ -16,7 +16,6 @@ import logging
 
 from flask import Flask
 
-from webapp.cache import ResultCache
 from webapp.config import Config, config as default_config
 from webapp.service import ScoringService
 
@@ -42,9 +41,10 @@ def create_app(app_config: Config | None = None) -> Flask:
     app.config["SECRET_KEY"] = cfg.secret_key
     app.config["ASCORE"] = cfg
 
-    # Shared, request-safe singletons (tables loaded once at startup).
+    # Shared, request-safe singleton (tables loaded once at startup).  Scoring
+    # never mutates engine state, so this is safe to reuse across requests and
+    # keeps per-request latency (and serverless cold starts) low.
     app.extensions["ascore_service"] = ScoringService()
-    app.extensions["ascore_cache"] = ResultCache(cfg.result_ttl_seconds)
 
     from webapp.routes import bp as routes_bp
 

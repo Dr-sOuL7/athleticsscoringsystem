@@ -26,18 +26,18 @@ class Config:
     """Immutable application configuration.
 
     Attributes:
-        max_upload_bytes: Hard limit on the uploaded file size (default 16 MB).
+        max_upload_bytes: Hard limit on the uploaded file size.  The default is
+            4 MB so a friendly 413 is returned *before* Vercel's opaque 4.5 MB
+            serverless body cap is hit.  Override for other hosts via
+            ``ASCORE_MAX_UPLOAD_BYTES``.
         allowed_extensions: File extensions the uploader accepts.
-        result_ttl_seconds: How long a generated workbook is retained in the
-            in-memory download cache before it is purged.
         secret_key: Flask session/signing key (override in production).
         max_preview_rows: Cap on how many rows each result table renders in the
             browser (the full data is always in the downloadable workbook).
     """
 
-    max_upload_bytes: int = _int_env("ASCORE_MAX_UPLOAD_BYTES", 16 * 1024 * 1024)
+    max_upload_bytes: int = _int_env("ASCORE_MAX_UPLOAD_BYTES", 4 * 1024 * 1024)
     allowed_extensions: frozenset[str] = frozenset({".csv", ".xlsx", ".xlsm"})
-    result_ttl_seconds: int = _int_env("ASCORE_RESULT_TTL_SECONDS", 3600)
     secret_key: str = os.environ.get("ASCORE_SECRET_KEY", "dev-secret-change-me")
     max_preview_rows: int = _int_env("ASCORE_MAX_PREVIEW_ROWS", 1000)
 

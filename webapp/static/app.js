@@ -56,10 +56,36 @@
     });
   }
 
-  // Guard against double submits on large files.
+  // Client-side upload-size guard + double-submit protection.
   var form = document.querySelector(".upload-form");
   if (form && submitBtn) {
-    form.addEventListener("submit", function () {
+    var maxBytes = parseInt(form.getAttribute("data-max-bytes") || "0", 10);
+    var maxMb = form.getAttribute("data-max-mb") || "4";
+    var sizeError = document.getElementById("size-error");
+
+    function totalSelectedBytes() {
+      var total = 0;
+      [input, document.getElementById("mapping-input")].forEach(function (el) {
+        if (el && el.files) {
+          for (var i = 0; i < el.files.length; i++) total += el.files[i].size;
+        }
+      });
+      return total;
+    }
+
+    form.addEventListener("submit", function (e) {
+      // Reject oversized uploads before hitting the serverless body limit.
+      if (maxBytes > 0 && totalSelectedBytes() > maxBytes) {
+        e.preventDefault();
+        if (sizeError) {
+          sizeError.textContent =
+            "Your file(s) exceed the " + maxMb + " MB limit. Please split the " +
+            "meet into smaller files or remove the optional roster.";
+          sizeError.hidden = false;
+          sizeError.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
       submitBtn.disabled = true;
       submitBtn.textContent = "Scoring…";
     });
