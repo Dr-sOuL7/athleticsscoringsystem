@@ -48,10 +48,26 @@
   </div>
 </section>
 
+{% set enriched = outcome.mapping_used %}
+
+{% if enriched %}
+<div class="roster-note roster-note-on">
+  ✅ Enriched with roster <strong>{{ outcome.mapping_filename }}</strong>
+  ({{ outcome.mapping_entries }} bib{{ '' if outcome.mapping_entries == 1 else 's' }} mapped).
+</div>
+{% else %}
+<div class="roster-note roster-note-off">
+  ℹ️ No roster uploaded — athletes are shown by <strong>bib number</strong>.
+  Add a roster file to include names, IDs and colleges.
+</div>
+{% endif %}
+
 <div class="tabs" data-tabs>
   <div class="tab-bar" role="tablist">
     <button class="tab-btn is-active" data-tab="athletes" role="tab">Athlete ranking</button>
+    {% if outcome.college_count %}
     <button class="tab-btn" data-tab="colleges" role="tab">College ranking</button>
+    {% endif %}
     <button class="tab-btn" data-tab="details" role="tab">Details</button>
     {% if outcome.rejected_count %}
     <button class="tab-btn tab-btn-warn" data-tab="rejected" role="tab">
@@ -65,16 +81,20 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>Rank</th><th>Name</th><th>ID</th><th>College</th>
+          <tr><th>Rank</th><th>Bib</th>
+              {% if enriched %}<th>Name</th><th>ID</th><th>College</th>{% endif %}
               <th>Gender</th><th class="num">Events</th><th class="num">Score</th></tr>
         </thead>
         <tbody>
           {% for row in outcome.athletes[:preview] %}
           <tr class="{{ 'top-row' if row['RANK'] <= 3 }}">
             <td class="rank">{{ medal(row['RANK']) }}</td>
+            <td class="bib">{{ row['BIB NUMBER'] }}</td>
+            {% if enriched %}
             <td>{{ row['NAME'] }}</td>
             <td>{{ row['ID'] }}</td>
             <td>{{ row['COLLEGE'] }}</td>
+            {% endif %}
             <td>{{ row['GENDER'] }}</td>
             <td class="num">{{ row['EVENTS'] }}</td>
             <td class="num score">{{ row['SCORE'] }}</td>
@@ -114,15 +134,20 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>Name</th><th>ID</th><th>College</th><th>Gender</th>
-              <th>Event</th><th>Type</th><th>Result</th><th class="num">Score</th></tr>
+          <tr><th>Bib</th>
+              {% if enriched %}<th>Name</th><th>ID</th><th>College</th>{% endif %}
+              <th>Gender</th><th>Event</th><th>Type</th><th>Result</th>
+              <th class="num">Score</th></tr>
         </thead>
         <tbody>
           {% for row in outcome.details[:preview] %}
           <tr>
+            <td class="bib">{{ row['BIB NUMBER'] }}</td>
+            {% if enriched %}
             <td>{{ row['NAME'] }}</td>
             <td>{{ row['ID'] }}</td>
             <td>{{ row['COLLEGE'] }}</td>
+            {% endif %}
             <td>{{ row['GENDER'] }}</td>
             <td>{{ row['EVENT NAME'] }}</td>
             <td>{{ row['PERFORMANCE TYPE'] }}</td>
@@ -142,14 +167,14 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>Row</th><th>Name</th><th>Event</th>
+          <tr><th>Row</th><th>Bib</th><th>Event</th>
               <th>Result</th><th>Reason</th></tr>
         </thead>
         <tbody>
           {% for row in outcome.rejected[:preview] %}
           <tr>
             <td class="num">{{ row['ROW'] }}</td>
-            <td>{{ row['NAME'] }}</td>
+            <td class="bib">{{ row['BIB NUMBER'] }}</td>
             <td>{{ row['EVENT NAME'] }}</td>
             <td>{{ row['RESULT'] }}</td>
             <td class="reason">{{ row['REASON'] }}</td>

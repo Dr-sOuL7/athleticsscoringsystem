@@ -69,7 +69,23 @@ body {
 .dropzone-hint { color: var(--ink-soft); font-size: .88rem; }
 .dropzone.has-file { border-color: var(--good); background: #f4fbf5; }
 
+.dropzone-secondary { border-style: dashed; opacity: .95; margin-bottom: 4px; }
 .upload-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+
+/* Field labels / step badges on the upload form */
+.field-label { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0 10px; }
+.field-label-spaced { margin-top: 24px; }
+.field-hint { margin: 2px 0 0; }
+.step-badge { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; }
+.step-badge-optional { background: #8a94a6; }
+.req-tag, .opt-tag { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+.req-tag { background: #eef3fb; color: var(--brand-dark); }
+.opt-tag { background: #f0efe4; color: #7a6f2b; }
+
+/* Roster banner on the results page */
+.roster-note { border-radius: 10px; padding: 11px 16px; margin: 0 0 16px; font-size: .95rem; border: 1px solid; }
+.roster-note-on { background: #eafaf0; border-color: #bce8cd; color: var(--good); }
+.roster-note-off { background: #eef3fb; border-color: #cfe0f3; color: var(--brand-dark); }
 
 /* ---- Buttons ---- */
 .btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 10px; padding: 11px 18px; font-size: 1rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .15s, box-shadow .15s, transform .02s; }
@@ -133,6 +149,7 @@ code { background: #eef1f6; padding: 1px 6px; border-radius: 6px; font-size: .88
 .data-table tbody tr:hover { background: #f7faff; }
 .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .data-table .score { font-weight: 700; color: var(--brand-dark); }
+.data-table .bib { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--brand); }
 .data-table .rank { font-size: 1.05rem; }
 .data-table .top-row { background: #fffdf3; }
 .data-table .top-row:hover { background: #fdf8e4; }

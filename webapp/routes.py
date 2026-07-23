@@ -30,10 +30,10 @@ _LOG = logging.getLogger("athletics.web")
 
 bp = Blueprint("routes", __name__)
 
-# Path to the bundled example workbook shipped with the project.
-_EXAMPLE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "example_input.xlsx"
-)
+# Paths to the bundled example files shipped with the project.
+_EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
+_EXAMPLE_PATH = _EXAMPLES_DIR / "example_input.xlsx"
+_EXAMPLE_MAPPING_PATH = _EXAMPLES_DIR / "example_mapping.xlsx"
 
 
 def _service() -> ScoringService:
@@ -93,7 +93,7 @@ def help_page() -> str:
 
 @bp.post("/score")
 def score():
-    """Handle an uploaded file: validate, score, render results."""
+    """Handle an uploaded file (+ optional mapping): validate, score, render."""
     file = request.files.get("file")
     if file is None or file.filename == "":
         flash("Please choose a CSV or Excel file to upload.", "error")
@@ -108,8 +108,26 @@ def score():
 
     data = file.read()
     filename = secure_filename(file.filename) or "upload"
+
+    # Optional BIB -> identity mapping file.
+    mapping_filename: str | None = None
+    mapping_data: bytes | None = None
+    mapping_file = request.files.get("mapping")
+    if mapping_file is not None and mapping_file.filename:
+        if not _allowed(mapping_file.filename):
+            flash(
+                "Unsupported mapping file type. Please upload a .xlsx or .csv "
+                "file, or leave it empty.",
+                "error",
+            )
+            return redirect(url_for("routes.index"))
+        mapping_filename = secure_filename(mapping_file.filename) or "mapping"
+        mapping_data = mapping_file.read()
+
     try:
-        outcome = _service().process_upload(filename, data)
+        outcome = _service().process_upload(
+            filename, data, mapping_filename, mapping_data
+        )
     except ProcessingError as exc:
         _LOG.info("Rejected upload %s: %s", filename, exc)
         flash(str(exc), "error")
@@ -141,13 +159,19 @@ def score():
 
 @bp.get("/example")
 def example():
-    """Score the bundled example file so users can try the app instantly."""
+    """Score the bundled example (main + mapping) so users can try it instantly."""
     if not _EXAMPLE_PATH.exists():
         flash("The example file is unavailable.", "error")
         return redirect(url_for("routes.index"))
     data = _EXAMPLE_PATH.read_bytes()
+    map_name = map_data = None
+    if _EXAMPLE_MAPPING_PATH.exists():
+        map_name = _EXAMPLE_MAPPING_PATH.name
+        map_data = _EXAMPLE_MAPPING_PATH.read_bytes()
     try:
-        outcome = _service().process_upload(_EXAMPLE_PATH.name, data)
+        outcome = _service().process_upload(
+            _EXAMPLE_PATH.name, data, map_name, map_data
+        )
     except ProcessingError as exc:  # pragma: no cover - example is known-good
         flash(str(exc), "error")
         return redirect(url_for("routes.index"))

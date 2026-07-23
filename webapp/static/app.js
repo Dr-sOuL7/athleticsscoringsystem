@@ -22,6 +22,19 @@
     });
   }
 
+  // Optional mapping/roster file: reflect the chosen filename.
+  var mapInput = document.getElementById("mapping-input");
+  var mapZone = document.getElementById("dropzone-map");
+  var mapText = document.getElementById("dropzone-map-text");
+  if (mapInput) {
+    mapInput.addEventListener("change", function () {
+      if (mapInput.files && mapInput.files.length && mapText) {
+        mapText.innerHTML = "<strong>" + mapInput.files[0].name + "</strong> selected";
+        if (mapZone) mapZone.classList.add("has-file");
+      }
+    });
+  }
+
   if (dropzone && input) {
     ["dragenter", "dragover"].forEach(function (evt) {
       dropzone.addEventListener(evt, function (e) {
