@@ -22,7 +22,7 @@
     </p>
   </div>
   <div class="results-actions">
-    <a class="btn btn-primary" href="{{ url_for('routes.download', token=token) }}">
+    <a class="btn btn-primary" href="{{ download_uri }}" download="{{ download_name }}">
       ⬇ Download Excel
     </a>
     <a class="btn btn-ghost" href="{{ url_for('routes.index') }}">Score another file</a>
