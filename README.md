@@ -10,6 +10,13 @@ Athletes are identified by the composite key **(NAME, ID, COLLEGE)**. A single
 athlete may appear in the input many times (one row per event); the system sums
 their World Athletics points across all events into a single total score.
 
+It ships with **two interfaces** over the same trusted scoring engine:
+
+- a **web application** (upload a file in the browser, view rankings, download
+  Excel) — see [Web application](#web-application);
+- a **command-line tool** (`main.py`) for scripting and batch runs — see
+  [Command-line usage](#usage).
+
 ---
 
 ## Features
@@ -44,9 +51,10 @@ their World Athletics points across all events into a single total score.
 ```
 athleticsscoringsystem/
 ├── main.py                         # CLI entry point (orchestration only)
+├── run_web.py                      # Web app launcher (waitress / dev server)
 ├── requirements.txt
 ├── README.md
-├── athletics_scoring/              # The application package
+├── athletics_scoring/              # The scoring engine (UI-independent)
 │   ├── __init__.py
 │   ├── models.py                   # Dataclasses shared across modules
 │   ├── performance.py              # Unit-agnostic result parser
@@ -54,11 +62,20 @@ athleticsscoringsystem/
 │   ├── timing.py                   # FAT / hand-timing conversion hook
 │   ├── tables.py                   # Table loading + binary-search lookup
 │   ├── validator.py                # Row & column validation
-│   ├── scorer.py                   # The UI-independent scoring engine
+│   ├── scorer.py                   # The scoring engine + aggregation/ranking
 │   ├── loader.py                   # .xlsx / .csv input loader
 │   ├── writer.py                   # Formatted .xlsx output writer
 │   ├── logging_config.py           # Centralised logging setup
 │   └── build_tables.py             # Build step: workbook -> bundled JSON
+├── webapp/                         # Flask web application (new)
+│   ├── __init__.py                 # Application factory (create_app)
+│   ├── config.py                   # Env-driven configuration
+│   ├── service.py                  # Adapter: upload -> engine -> view models
+│   ├── cache.py                    # TTL download cache
+│   ├── routes.py                   # HTTP routes (upload/results/download)
+│   ├── logging_bootstrap.py        # Web server logging
+│   ├── templates/                  # Jinja2 templates (base/index/results/help)
+│   └── static/                     # style.css, app.js
 ├── data/
 │   ├── source/WA_Scoring_Tables_2025.xlsx   # Original World Athletics workbook
 │   └── scoring_tables.json         # Compact bundled tables (generated)
@@ -68,7 +85,8 @@ athleticsscoringsystem/
 │   ├── example_input.csv           # Example input (CSV)
 │   └── example_output.xlsx         # Example output
 └── tests/
-    └── test_scoring.py
+    ├── test_scoring.py             # Engine tests
+    └── test_webapp.py              # Web app tests
 ```
 
 ---
@@ -81,7 +99,72 @@ Requires **Python 3.10+**.
 pip install -r requirements.txt
 ```
 
-The only runtime dependency is `openpyxl`.
+Dependencies: `openpyxl` (engine), plus `Flask` and `waitress` (web app).
+
+---
+
+## Web application
+
+A clean, responsive website for non-technical users: upload a CSV/XLSX, see the
+athlete and college rankings in the browser, and download the formatted Excel
+workbook. It reuses the exact same scoring engine as the CLI.
+
+### Run it locally
+
+```bash
+pip install -r requirements.txt
+python run_web.py
+```
+
+Then open **http://127.0.0.1:8000** in your browser. Click **“Try the example
+file”** to see it work immediately, or upload your own spreadsheet.
+
+Options:
+
+```bash
+python run_web.py --port 5000      # choose a port
+python run_web.py --host 0.0.0.0   # expose on your local network
+python run_web.py --debug          # Flask dev server with auto-reload
+```
+
+### What the site does
+
+1. **Upload** a `.xlsx` or `.csv` (drag & drop or file picker).
+2. **Validate** — missing columns, bad file types and oversized files produce a
+   clear message; invalid *rows* are skipped and listed, never fatal.
+3. **Score** using the World Athletics tables (engine unchanged).
+4. **Display** athlete ranking, college ranking, a per-performance breakdown and
+   any rejected rows — sorted by descending score, medals for the top three.
+5. **Download** the generated Excel workbook (Results, College Ranking, Details,
+   Rejected sheets).
+
+### Configuration (environment variables)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ASCORE_MAX_UPLOAD_BYTES` | `16777216` (16 MB) | Max upload size |
+| `ASCORE_RESULT_TTL_SECONDS` | `3600` | How long a download link stays valid |
+| `ASCORE_MAX_PREVIEW_ROWS` | `1000` | Max rows rendered per table (full data is always in the download) |
+| `ASCORE_SECRET_KEY` | `dev-secret-change-me` | Flask secret — **set this in production** |
+
+### Deployment notes
+
+The app is a standard WSGI application (`webapp:create_app()`), served locally by
+**waitress** (cross-platform, used by `run_web.py`). For a public deployment:
+
+```bash
+# Linux (gunicorn)
+gunicorn "webapp:create_app()" --bind 0.0.0.0:8000 --workers 3
+
+# Any platform (waitress)
+waitress-serve --listen=0.0.0.0:8000 --call webapp:create_app
+```
+
+Put it behind a reverse proxy (nginx/Caddy) for TLS, set `ASCORE_SECRET_KEY`,
+and it runs on any PaaS that supports a WSGI app. Processing is in-memory and
+stateless (no database); downloads are held briefly in a per-process cache — if
+you scale to multiple workers, back that cache with a shared store (e.g. Redis).
+The `ResultCache` interface is intentionally small to make that swap easy.
 
 ---
 
@@ -176,6 +259,9 @@ python -m unittest discover -s tests -v
 python -m pytest -q
 ```
 
+This runs the engine tests (`test_scoring.py`) and the web-app integration
+tests (`test_webapp.py`) — 38 tests in total.
+
 ---
 
 ## Architecture notes
@@ -218,8 +304,10 @@ The design leaves clear seams for planned features:
 - **Meet records** — compare each scored mark against a stored records table.
 - **Hand timing** — already implemented in `timing.py`; enable via the `TIMING`
   column.
-- **Certificates / PDF reports / GUI** — build on top of `ScoringReport`; the
-  engine needs no changes.
+- **Web UI** — implemented: the `webapp/` Flask app (upload, rankings,
+  download) is a thin caller over the same engine.
+- **Certificates / PDF reports / API** — build on top of `ScoringReport` /
+  `ScoringOutcome`; the engine needs no changes.
 
 ---
 
