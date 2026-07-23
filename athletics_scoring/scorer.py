@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from athletics_scoring.events import EventRegistry
+from athletics_scoring.mapping import AthleteMapping, bib_key
 from athletics_scoring.models import (
     AthleteAggregate,
     AthletePerformance,
@@ -28,43 +29,39 @@ from athletics_scoring.timing import to_fat_equivalent
 from athletics_scoring.validator import ValidationError, Validator
 
 
-def _athlete_key(perf: AthletePerformance) -> tuple[str, str, str]:
-    """Return the composite identity key (NAME, ID, COLLEGE) for an athlete.
+def _athlete_key(perf: AthletePerformance) -> str:
+    """Return the identity key (normalised BIB NUMBER) for an athlete.
 
-    Name and college are compared case-insensitively and whitespace-normalised;
-    the id is compared as a trimmed string.  This groups the same athlete's
-    multiple event entries together even when spelling case differs slightly.
+    Bibs are compared case-insensitively and whitespace-normalised so the same
+    athlete's multiple event entries group together regardless of incidental
+    spacing or case.
     """
-    name = " ".join(perf.name.split()).lower()
-    athlete_id = str(perf.athlete_id).strip()
-    college = " ".join(perf.college.split()).lower()
-    return (name, athlete_id, college)
+    return bib_key(perf.bib_number)
 
 
 def aggregate_by_athlete(report: ScoringReport) -> list[AthleteAggregate]:
     """Collapse per-performance scores into one summed row per athlete.
 
-    Athletes are identified by the composite key (NAME, ID, COLLEGE).  The
-    returned list is sorted by descending total score, with ties broken
-    deterministically by name then id for reproducible output.
+    Athletes are identified by their **BIB NUMBER**.  The returned list is
+    sorted by descending total score, ties broken deterministically by bib for
+    reproducible output.  Identity fields (name/id/college) are left blank here;
+    call :func:`apply_mapping` afterwards to enrich them.
 
     Args:
         report: A scoring report whose ``scored`` list holds the individual
             performances to aggregate.
 
     Returns:
-        One :class:`AthleteAggregate` per distinct athlete.
+        One :class:`AthleteAggregate` per distinct bib.
     """
-    grouped: dict[tuple[str, str, str], AthleteAggregate] = {}
+    grouped: dict[str, AthleteAggregate] = {}
     for result in report.scored:
         perf = result.performance
         key = _athlete_key(perf)
         aggregate = grouped.get(key)
         if aggregate is None:
             aggregate = AthleteAggregate(
-                name=perf.name,
-                athlete_id=str(perf.athlete_id),
-                college=perf.college,
+                bib_number=str(perf.bib_number).strip(),
                 gender=perf.gender,
                 total_score=0,
                 results=[],
@@ -79,8 +76,35 @@ def aggregate_by_athlete(report: ScoringReport) -> list[AthleteAggregate]:
         aggregate.results.sort(key=lambda r: -r.score)
 
     aggregates.sort(
-        key=lambda a: (-a.total_score, a.name.lower(), str(a.athlete_id))
+        key=lambda a: (-a.total_score, str(a.bib_number))
     )
+    return aggregates
+
+
+def apply_mapping(
+    aggregates: list[AthleteAggregate], mapping: AthleteMapping | None
+) -> list[AthleteAggregate]:
+    """Enrich athlete aggregates with NAME/ID/COLLEGE from a mapping.
+
+    A bib that has no mapping entry keeps blank identity fields (its score is
+    still reported).  Passing ``None`` is a no-op, so the caller can always call
+    this regardless of whether a mapping file was supplied.
+
+    Args:
+        aggregates: Per-athlete aggregates to enrich in place.
+        mapping: The optional bib → identity mapping.
+
+    Returns:
+        The same list, enriched, for convenient chaining.
+    """
+    if not mapping:
+        return aggregates
+    for aggregate in aggregates:
+        info = mapping.get(aggregate.bib_number)
+        if info is not None:
+            aggregate.name = info.name
+            aggregate.athlete_id = info.athlete_id
+            aggregate.college = info.college
     return aggregates
 
 
@@ -92,16 +116,22 @@ def rank_colleges(aggregates: list[AthleteAggregate]) -> list[CollegeRanking]:
     Colleges are grouped case/whitespace-insensitively and sorted by descending
     score, ties broken by college name for reproducibility.
 
+    Athletes with no known college (e.g. when no mapping file was supplied, or a
+    bib was unmapped) are skipped, so this returns an empty list when there is
+    no college information at all.
+
     Args:
         aggregates: Per-athlete aggregates (as produced by
-            :func:`aggregate_by_athlete`).
+            :func:`aggregate_by_athlete`, ideally after :func:`apply_mapping`).
 
     Returns:
-        One :class:`CollegeRanking` per distinct college.
+        One :class:`CollegeRanking` per distinct college (possibly empty).
     """
     grouped: dict[str, CollegeRanking] = {}
     for athlete in aggregates:
         key = " ".join(athlete.college.split()).lower()
+        if key == "":
+            continue  # no college information for this athlete
         college = grouped.get(key)
         if college is None:
             college = CollegeRanking(

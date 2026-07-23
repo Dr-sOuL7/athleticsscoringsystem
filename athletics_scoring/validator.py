@@ -90,11 +90,9 @@ class Validator:
         Raises:
             ValidationError: With a descriptive reason if the row is invalid.
         """
-        # 1) Mandatory identity fields must not be blank.
-        if not perf.name or not perf.name.strip():
-            raise ValidationError("NAME is empty")
-        if not str(perf.athlete_id).strip():
-            raise ValidationError("ID is empty")
+        # 1) Bib number is the athlete's identity and must not be blank.
+        if not str(perf.bib_number).strip():
+            raise ValidationError("BIB NUMBER is empty")
 
         # 2) Gender.
         try:

@@ -6,9 +6,11 @@ Excel or CSV file of athletes' results, computes each athlete's World Athletics
 points, and writes a formatted Excel file with **one row per athlete**, sorted
 from highest total score to lowest.
 
-Athletes are identified by the composite key **(NAME, ID, COLLEGE)**. A single
-athlete may appear in the input many times (one row per event); the system sums
-their World Athletics points across all events into a single total score.
+Athletes are identified by their **BIB NUMBER**. The main scoring file needs
+only the bib plus the performance columns; a single athlete may appear many
+times (one row per event) and the system sums their World Athletics points
+across all events into a single total. Human-readable **NAME / ID / COLLEGE**
+are optional and come from a separate **roster (mapping) file** matched on bib.
 
 It ships with **two interfaces** over the same trusted scoring engine:
 
@@ -81,8 +83,10 @@ athleticsscoringsystem/
 │   └── scoring_tables.json         # Compact bundled tables (generated)
 ├── examples/
 │   ├── generate_example_input.py
-│   ├── example_input.xlsx          # Example input (Excel)
-│   ├── example_input.csv           # Example input (CSV)
+│   ├── example_input.xlsx          # Example main file, bib-keyed (Excel)
+│   ├── example_input.csv           # Example main file (CSV)
+│   ├── example_mapping.xlsx        # Example roster: BIB -> NAME/ID/COLLEGE
+│   ├── example_mapping.csv         # Example roster (CSV)
 │   └── example_output.xlsx         # Example output
 └── tests/
     ├── test_scoring.py             # Engine tests
@@ -129,12 +133,15 @@ python run_web.py --debug          # Flask dev server with auto-reload
 
 ### What the site does
 
-1. **Upload** a `.xlsx` or `.csv` (drag & drop or file picker).
-2. **Validate** — missing columns, bad file types and oversized files produce a
-   clear message; invalid *rows* are skipped and listed, never fatal.
+1. **Upload** a bib-keyed results file (`.xlsx`/`.csv`), and *optionally* a
+   roster file to add names and colleges (two clearly-labelled upload steps).
+2. **Validate** — missing columns, bad file types, oversized files, and invalid
+   rosters (missing bib column, duplicate bibs) produce a clear message; invalid
+   *rows* are skipped and listed, never fatal.
 3. **Score** using the World Athletics tables (engine unchanged).
-4. **Display** athlete ranking, college ranking, a per-performance breakdown and
-   any rejected rows — sorted by descending score, medals for the top three.
+4. **Display** athlete ranking (by bib, enriched when a roster is supplied),
+   college ranking, a per-performance breakdown and any rejected rows — sorted
+   by descending score, medals for the top three.
 5. **Download** the generated Excel workbook (Results, College Ranking, Details,
    Rejected sheets).
 
@@ -170,22 +177,26 @@ The `ResultCache` interface is intentionally small to make that swap easy.
 
 ## Usage
 
-Score an input file (writes `<input>_scored.xlsx` next to it by default):
+Score a main file (writes `<input>_scored.xlsx` next to it by default):
 
 ```bash
 python main.py examples/example_input.xlsx
 ```
 
-Choose an explicit output path:
+Enrich the output with athlete names/colleges from a roster file, and choose an
+explicit output path:
 
 ```bash
-python main.py examples/example_input.csv -o results.xlsx
+python main.py examples/example_input.xlsx \
+    --mapping examples/example_mapping.xlsx \
+    -o results.xlsx
 ```
 
 Other options:
 
 ```bash
 python main.py INPUT.xlsx \
+    --mapping ROSTER.xlsx \               # optional BIB -> identity file
     --tables data/scoring_tables.json \   # use a specific table file
     --no-rejects \                        # omit the "Rejected" sheet
     --log-dir logs                        # where to write the run log
@@ -193,11 +204,11 @@ python main.py INPUT.xlsx \
 
 ### Input format
 
+**Main scoring file** — one row per performance, keyed by bib:
+
 | Column            | Description                                   |
 |-------------------|-----------------------------------------------|
-| `NAME`            | Athlete's name                                |
-| `ID`              | Bib / registration id (text; keeps leading 0s)|
-| `COLLEGE`         | College / team name                           |
+| `BIB NUMBER`      | Athlete's bib — the identity (text; must not be empty) |
 | `GENDER`          | `Male`/`Female`/`M`/`W`/`Men`/`Women`         |
 | `EVENT NAME`      | Friendly name or official code                |
 | `PERFORMANCE TYPE`| `TIME` or `DISTANCE`                           |
@@ -207,29 +218,44 @@ python main.py INPUT.xlsx \
 `RESULT` accepts plain seconds (`10.87`), `m:s.cc` (`2:05.31`), `h:m:s`
 (`1:02:05.3`) for times, and metres (`6.72`) for distances.
 
+**Optional roster (mapping) file** — matches each bib to identity:
+
+| Column       | Description                                          |
+|--------------|------------------------------------------------------|
+| `BIB NUMBER` | Required; the join key                               |
+| `NAME`       | *(optional)* athlete name                            |
+| `ID`         | *(optional)* registration id                         |
+| `COLLEGE`    | *(optional)* college / team name                     |
+
+Rules: `NAME`/`ID`/`COLLEGE` may be partially missing; **duplicate bibs are
+rejected**; a bib present in the main file but absent from the roster keeps its
+score with blank identity; a bib in the roster but not in the main file is
+simply unused.
+
 ### Output
 
-An `.xlsx` workbook with up to three sheets:
+An `.xlsx` workbook with up to four sheets:
 
-- **Results** — one row per athlete, sorted by descending total `SCORE`:
+- **Results** — one row per athlete (bib), sorted by descending total `SCORE`:
 
-  `RANK · NAME · ID · COLLEGE · GENDER · SCORE`
+  `RANK · BIB NUMBER · NAME · ID · COLLEGE · GENDER · SCORE`
 
   where `SCORE` is the sum of the athlete's World Athletics points across every
-  event they entered.
+  event they entered. `NAME`/`ID`/`COLLEGE` are filled from the roster (blank
+  without one).
 
 - **College Ranking** — one row per college, sorted by descending team `SCORE`:
 
   `RANK · COLLEGE · ATHLETES · SCORE`
 
   where team `SCORE` is the sum of every member athlete's total score and
-  `ATHLETES` is how many scoring athletes the college fielded (omit with
-  `--no-colleges`).
+  `ATHLETES` is how many scoring athletes the college fielded. Only produced
+  when a roster supplies colleges (omit with `--no-colleges`).
 
 - **Details** — the per-performance breakdown behind each total, grouped under
   the athlete (highest-scoring event first):
 
-  `RANK · NAME · ID · COLLEGE · GENDER · EVENT NAME · PERFORMANCE TYPE · RESULT · SCORE`
+  `RANK · BIB NUMBER · NAME · ID · COLLEGE · GENDER · EVENT NAME · PERFORMANCE TYPE · RESULT · SCORE`
 
   (omit with `--no-details`.)
 

@@ -8,14 +8,16 @@
 </section>
 
 <section class="card info-card">
-  <h2>1. Prepare your spreadsheet</h2>
-  <p>Use one row per performance. The first row must contain these exact headers:</p>
+  <h2>1. Prepare your results file</h2>
+  <p>Use one row per performance. The athlete is identified by their
+     <strong>bib number</strong>. The first row must contain these exact headers:</p>
   <ul class="pill-list">
-    <li>NAME</li><li>ID</li><li>COLLEGE</li><li>GENDER</li>
+    <li>BIB NUMBER</li><li>GENDER</li>
     <li>EVENT NAME</li><li>PERFORMANCE TYPE</li><li>RESULT</li>
   </ul>
   <table class="mini-table wide">
     <tr><th>Column</th><th>Accepted values</th></tr>
+    <tr><td>BIB NUMBER</td><td>Any unique athlete identifier (e.g. <code>101</code>); must not be empty</td></tr>
     <tr><td>GENDER</td><td>Male / Female / M / W / Men / Women</td></tr>
     <tr><td>EVENT NAME</td><td>Friendly (<code>Long Jump</code>, <code>Shot Put</code>) or code (<code>LJ</code>, <code>100m</code>)</td></tr>
     <tr><td>PERFORMANCE TYPE</td><td><code>TIME</code> or <code>DISTANCE</code></td></tr>
@@ -25,23 +27,38 @@
 </section>
 
 <section class="card info-card">
-  <h2>2. How scores are calculated</h2>
+  <h2>2. Optional roster (names &amp; colleges)</h2>
+  <p>To show athlete names and college standings, add a second file matching each
+     bib to identity. Only <strong>BIB NUMBER</strong> is required:</p>
+  <ul class="pill-list">
+    <li>BIB NUMBER</li><li>NAME</li><li>ID</li><li>COLLEGE</li>
+  </ul>
   <ul class="check-list">
-    <li>Each result is scored with the official World Athletics Scoring Tables (2025).</li>
-    <li>Track events: a faster time scores higher. Field events: a longer mark scores higher.</li>
-    <li>A performance between two table entries takes the <em>lower</em> score.</li>
-    <li>An athlete is identified by <strong>NAME + ID + COLLEGE</strong>; scores from all
-        their events are <strong>summed</strong> into one total.</li>
-    <li>A college's score is the <strong>sum of its athletes' totals</strong>.</li>
+    <li>NAME, ID and COLLEGE may be partially missing.</li>
+    <li>Each bib must appear <strong>at most once</strong> — duplicate bibs are rejected.</li>
+    <li>A bib in your results but not in the roster still scores; its name/college stay blank.</li>
+    <li>Without a roster, results are shown by bib number only (no college ranking).</li>
   </ul>
 </section>
 
 <section class="card info-card">
-  <h2>3. Invalid rows</h2>
+  <h2>3. How scores are calculated</h2>
+  <ul class="check-list">
+    <li>Each result is scored with the official World Athletics Scoring Tables (2025).</li>
+    <li>Track events: a faster time scores higher. Field events: a longer mark scores higher.</li>
+    <li>A performance between two table entries takes the <em>lower</em> score.</li>
+    <li>An athlete is identified by <strong>BIB NUMBER</strong>; scores from all their
+        events are <strong>summed</strong> into one total.</li>
+    <li>A college's score is the <strong>sum of its athletes' totals</strong> (needs a roster).</li>
+  </ul>
+</section>
+
+<section class="card info-card">
+  <h2>4. Invalid rows</h2>
   <p>
-    Rows with an unknown event, an unreadable result, or a missing field are
-    skipped and listed on the <strong>Rejected</strong> tab with a reason — the
-    rest of your athletes are still scored.
+    Rows with an empty bib, an unknown event, an unreadable result, or a missing
+    field are skipped and listed on the <strong>Rejected</strong> tab with a
+    reason — the rest of your athletes are still scored.
   </p>
   <a class="btn btn-primary" href="{{ url_for('routes.index') }}">Score a file</a>
 </section>

@@ -5,8 +5,9 @@
 <section class="hero">
   <h1>Score your athletics meet in seconds</h1>
   <p class="lede">
-    Upload a spreadsheet of athlete performances and get official World Athletics
-    points, athlete rankings and college standings — ready to download as Excel.
+    Upload a spreadsheet of performances keyed by <strong>bib number</strong> and
+    get official World Athletics points and rankings — ready to download as Excel.
+    Add an optional roster to show athlete names and colleges.
   </p>
 </section>
 
@@ -14,6 +15,14 @@
   <form class="upload-form" method="post"
         action="{{ url_for('routes.score') }}"
         enctype="multipart/form-data">
+
+    <div class="field-label">
+      <span class="step-badge">1</span>
+      <div>
+        <strong>Results file</strong> <span class="req-tag">required</span>
+        <p class="muted field-hint">Performances by bib number.</p>
+      </div>
+    </div>
     <label class="dropzone" id="dropzone">
       <input type="file" id="file-input" name="file"
              accept=".csv,.xlsx,.xlsm" required>
@@ -24,12 +33,29 @@
       <span class="dropzone-hint">Accepted: .xlsx, .csv &nbsp;·&nbsp; up to {{ max_mb }} MB</span>
     </label>
 
+    <div class="field-label field-label-spaced">
+      <span class="step-badge step-badge-optional">2</span>
+      <div>
+        <strong>Athlete roster</strong> <span class="opt-tag">optional</span>
+        <p class="muted field-hint">Maps each bib to NAME / ID / COLLEGE to enrich the results.</p>
+      </div>
+    </div>
+    <label class="dropzone dropzone-secondary" id="dropzone-map">
+      <input type="file" id="mapping-input" name="mapping"
+             accept=".csv,.xlsx,.xlsm">
+      <span class="dropzone-icon">🧾</span>
+      <span class="dropzone-text" id="dropzone-map-text">
+        <strong>Choose a roster file</strong> or drag it here — or skip this
+      </span>
+      <span class="dropzone-hint">Must include a BIB NUMBER column</span>
+    </label>
+
     <div class="upload-actions">
       <button type="submit" class="btn btn-primary" id="submit-btn">
         Score results
       </button>
       <a class="btn btn-ghost" href="{{ url_for('routes.example') }}">
-        Try the example file
+        Try the example files
       </a>
     </div>
   </form>
@@ -37,23 +63,23 @@
 
 <section class="info-grid">
   <div class="card info-card">
-    <h2>Required columns</h2>
-    <p>Your file's first row must contain these headers:</p>
+    <h2>Results file columns</h2>
+    <p>The first row of your results file must contain these headers:</p>
     <ul class="pill-list">
-      <li>NAME</li><li>ID</li><li>COLLEGE</li><li>GENDER</li>
+      <li>BIB NUMBER</li><li>GENDER</li>
       <li>EVENT NAME</li><li>PERFORMANCE TYPE</li><li>RESULT</li>
     </ul>
-    <p class="muted">An optional <code>TIMING</code> column (<code>FAT</code>/<code>HAND</code>) is supported.</p>
+    <p class="muted"><strong>BIB NUMBER</strong> identifies the athlete. An optional
+      <code>TIMING</code> column (<code>FAT</code>/<code>HAND</code>) is supported.</p>
   </div>
 
   <div class="card info-card">
-    <h2>What you'll get</h2>
-    <ul class="check-list">
-      <li>Athlete ranking (scores summed per athlete)</li>
-      <li>College team ranking</li>
-      <li>Clear list of any rejected rows</li>
-      <li>A formatted Excel download</li>
+    <h2>Optional roster columns</h2>
+    <ul class="pill-list">
+      <li>BIB NUMBER</li><li>NAME</li><li>ID</li><li>COLLEGE</li>
     </ul>
+    <p class="muted">Only <strong>BIB NUMBER</strong> is required; NAME/ID/COLLEGE
+      may be partially missing. Each bib must appear at most once.</p>
   </div>
 
   <div class="card info-card">
