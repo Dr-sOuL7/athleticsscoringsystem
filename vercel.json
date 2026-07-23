@@ -1,21 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "athletics_scoring/**",
-          "webapp/**",
-          "data/scoring_tables.json",
-          "examples/example_input.xlsx",
-          "examples/example_mapping.xlsx"
-        ]
-      }
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "**"
     }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/api/index" }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
   ]
 }
