@@ -1,4 +1,4 @@
-"""Unit tests for the athletics scoring system.
+"""Unit tests for the athletics scoring engine (BIB-number identity).
 
 Run with::
 
@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 
 from athletics_scoring.events import EventRegistry, Gender, normalise_gender
+from athletics_scoring.events import PerformanceType
+from athletics_scoring.mapping import MappingError, build_mapping
 from athletics_scoring.models import AthletePerformance
 from athletics_scoring.performance import (
     PerformanceParseError,
@@ -19,10 +21,10 @@ from athletics_scoring.performance import (
 from athletics_scoring.scorer import (
     ScoringEngine,
     aggregate_by_athlete,
+    apply_mapping,
     rank_colleges,
 )
 from athletics_scoring.tables import EventTable, ScoringTables
-from athletics_scoring.events import PerformanceType
 from athletics_scoring.timing import TimingMethod, to_fat_equivalent
 
 _TABLES = ScoringTables.load()
@@ -31,9 +33,7 @@ _TABLES = ScoringTables.load()
 def _perf(**kwargs) -> AthletePerformance:
     """Build an AthletePerformance with sensible defaults for tests."""
     base = dict(
-        name="Test",
-        athlete_id="1",
-        college="X",
+        bib_number="101",
         gender="Male",
         event_name="100m",
         performance_type="TIME",
@@ -129,93 +129,168 @@ class TestScoringEngine(unittest.TestCase):
         result = self.engine.score_one(_perf())
         self.assertEqual(result.score, 925)
 
+    def test_empty_bib_is_rejected(self):
+        rows = [_perf(bib_number=""), _perf(bib_number="   ")]
+        report = self.engine.score_all(rows)
+        self.assertEqual(len(report.scored), 0)
+        self.assertEqual(len(report.rejected), 2)
+        self.assertIn("BIB NUMBER", report.rejected[0].reason)
+
     def test_sorted_descending_and_rejects(self):
         rows = [
-            _perf(name="Fast", result="10.00"),
-            _perf(name="Slow", result="12.00"),
-            _perf(name="BadEvent", event_name="Quidditch"),
+            _perf(bib_number="1", result="10.00"),
+            _perf(bib_number="2", result="12.00"),
+            _perf(bib_number="3", event_name="Quidditch"),
         ]
         report = self.engine.score_all(rows)
         self.assertEqual(len(report.scored), 2)
         self.assertEqual(len(report.rejected), 1)
-        # Descending by score.
-        self.assertGreaterEqual(
-            report.scored[0].score, report.scored[1].score
-        )
-        self.assertEqual(report.scored[0].performance.name, "Fast")
+        self.assertGreaterEqual(report.scored[0].score, report.scored[1].score)
+        self.assertEqual(report.scored[0].performance.bib_number, "1")
 
     def test_women_event_selected_by_gender(self):
         row = _perf(gender="Female", event_name="100m", result="11.90")
         self.assertEqual(self.engine.score_one(row).score, 1011)
 
 
-class TestAthleteAggregation(unittest.TestCase):
+class TestBibAggregation(unittest.TestCase):
     def setUp(self):
         self.engine = ScoringEngine(_TABLES)
 
-    def test_scores_are_summed_per_athlete(self):
+    def test_scores_summed_per_bib(self):
         rows = [
-            _perf(name="Multi", athlete_id="A1", event_name="100m", result="10.87"),
-            _perf(name="Multi", athlete_id="A1", event_name="Long Jump",
+            _perf(bib_number="7", event_name="100m", result="10.87"),
+            _perf(bib_number="7", event_name="Long Jump",
                   performance_type="DISTANCE", result="7.10"),
         ]
         report = self.engine.score_all(rows)
         aggregates = aggregate_by_athlete(report)
         self.assertEqual(len(aggregates), 1)
         agg = aggregates[0]
+        self.assertEqual(agg.bib_number, "7")
         self.assertEqual(agg.event_count, 2)
         self.assertEqual(agg.total_score, sum(r.score for r in report.scored))
+        # No mapping applied -> identity stays blank.
+        self.assertEqual(agg.name, "")
+        self.assertEqual(agg.college, "")
 
-    def test_distinct_athletes_grouped_by_name_id_college(self):
+    def test_distinct_bibs_grouped(self):
         rows = [
-            _perf(name="Same", athlete_id="1", college="A", result="10.87"),
-            _perf(name="Same", athlete_id="1", college="A", result="11.00"),
-            _perf(name="Same", athlete_id="2", college="A", result="10.90"),
+            _perf(bib_number="10", result="10.87"),
+            _perf(bib_number="10", result="11.00"),
+            _perf(bib_number="20", result="10.90"),
+            _perf(bib_number=" 10 ", result="10.95"),  # same bib, spacing
         ]
         aggregates = aggregate_by_athlete(self.engine.score_all(rows))
-        # Two distinct ids -> two athletes; grouping is case/space-insensitive.
+        bibs = sorted(a.bib_number for a in aggregates)
         self.assertEqual(len(aggregates), 2)
+        self.assertEqual(bibs, ["10", "20"])
 
     def test_sorted_by_total_descending(self):
         rows = [
-            _perf(name="Solo", athlete_id="S", result="12.00"),
-            _perf(name="Multi", athlete_id="M", result="12.00"),
-            _perf(name="Multi", athlete_id="M", event_name="Long Jump",
+            _perf(bib_number="solo", result="12.00"),
+            _perf(bib_number="multi", result="12.00"),
+            _perf(bib_number="multi", event_name="Long Jump",
                   performance_type="DISTANCE", result="7.00"),
         ]
         aggregates = aggregate_by_athlete(self.engine.score_all(rows))
-        self.assertEqual(aggregates[0].name, "Multi")  # summed two events
+        self.assertEqual(aggregates[0].bib_number, "multi")
         self.assertGreater(aggregates[0].total_score, aggregates[1].total_score)
+
+
+class TestMappingEnrichment(unittest.TestCase):
+    def setUp(self):
+        self.engine = ScoringEngine(_TABLES)
+        self._rows = [
+            _perf(bib_number="101", result="10.87"),
+            _perf(bib_number="102", result="11.50"),
+        ]
+
+    def _aggregates(self):
+        return aggregate_by_athlete(self.engine.score_all(self._rows))
+
+    def test_no_mapping_is_noop(self):
+        aggs = apply_mapping(self._aggregates(), None)
+        self.assertTrue(all(a.name == "" and a.college == "" for a in aggs))
+        # College ranking is empty with no college information.
+        self.assertEqual(rank_colleges(aggs), [])
+
+    def test_enrich_fills_identity(self):
+        mapping = build_mapping(
+            ["BIB NUMBER", "NAME", "ID", "COLLEGE"],
+            [["101", "Aarav", "M1", "Red College"]],
+        )
+        aggs = apply_mapping(self._aggregates(), mapping)
+        by_bib = {a.bib_number: a for a in aggs}
+        self.assertEqual(by_bib["101"].name, "Aarav")
+        self.assertEqual(by_bib["101"].college, "Red College")
+        # 102 is unmapped -> stays blank but keeps its score.
+        self.assertEqual(by_bib["102"].name, "")
+        self.assertGreater(by_bib["102"].total_score, 0)
+
+    def test_partial_mapping_columns(self):
+        # NAME/ID/COLLEGE may be partially missing; only BIB is required.
+        mapping = build_mapping(["BIB NUMBER", "NAME"], [["101", "OnlyName"]])
+        aggs = apply_mapping(self._aggregates(), mapping)
+        by_bib = {a.bib_number: a for a in aggs}
+        self.assertEqual(by_bib["101"].name, "OnlyName")
+        self.assertEqual(by_bib["101"].college, "")
+
+    def test_duplicate_bibs_rejected(self):
+        with self.assertRaises(MappingError):
+            build_mapping(
+                ["BIB NUMBER", "NAME"],
+                [["101", "A"], ["101", "B"]],
+            )
+
+    def test_missing_bib_column_rejected(self):
+        with self.assertRaises(MappingError):
+            build_mapping(["NAME", "ID"], [["A", "1"]])
+
+    def test_empty_bib_in_mapping_rejected(self):
+        with self.assertRaises(MappingError):
+            build_mapping(["BIB NUMBER", "NAME"], [["", "Nameless"]])
 
 
 class TestCollegeRanking(unittest.TestCase):
     def setUp(self):
         self.engine = ScoringEngine(_TABLES)
 
+    def _scored_with_mapping(self, rows, mapping_rows):
+        aggs = aggregate_by_athlete(self.engine.score_all(rows))
+        mapping = build_mapping(["BIB NUMBER", "COLLEGE"], mapping_rows)
+        return rank_colleges(apply_mapping(aggs, mapping))
+
     def test_college_score_is_sum_of_athletes(self):
         rows = [
-            _perf(name="A", athlete_id="1", college="Red", result="10.87"),
-            _perf(name="B", athlete_id="2", college="Red", result="11.50"),
-            _perf(name="C", athlete_id="3", college="Blue", result="10.50"),
+            _perf(bib_number="1", result="10.87"),
+            _perf(bib_number="2", result="11.50"),
+            _perf(bib_number="3", result="10.50"),
         ]
-        aggregates = aggregate_by_athlete(self.engine.score_all(rows))
-        colleges = rank_colleges(aggregates)
+        colleges = self._scored_with_mapping(
+            rows,
+            [["1", "Red"], ["2", "Red"], ["3", "Blue"]],
+        )
         by_name = {c.college: c for c in colleges}
-        red_total = sum(a.total_score for a in aggregates if a.college == "Red")
-        self.assertEqual(by_name["Red"].total_score, red_total)
         self.assertEqual(by_name["Red"].athlete_count, 2)
 
     def test_colleges_sorted_descending(self):
         rows = [
-            _perf(name="A", athlete_id="1", college="Strong", result="10.00"),
-            _perf(name="B", athlete_id="2", college="Strong", result="10.20"),
-            _perf(name="C", athlete_id="3", college="Weak", result="14.00"),
+            _perf(bib_number="1", result="10.00"),
+            _perf(bib_number="2", result="10.20"),
+            _perf(bib_number="3", result="14.00"),
         ]
-        colleges = rank_colleges(
-            aggregate_by_athlete(self.engine.score_all(rows))
+        colleges = self._scored_with_mapping(
+            rows,
+            [["1", "Strong"], ["2", "Strong"], ["3", "Weak"]],
         )
         self.assertEqual(colleges[0].college, "Strong")
         self.assertGreater(colleges[0].total_score, colleges[1].total_score)
+
+    def test_no_college_info_yields_no_ranking(self):
+        rows = [_perf(bib_number="1", result="10.00")]
+        aggs = aggregate_by_athlete(self.engine.score_all(rows))
+        self.assertEqual(rank_colleges(aggs), [])
 
 
 class TestBundledDataIntegrity(unittest.TestCase):

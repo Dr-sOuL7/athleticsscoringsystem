@@ -1,9 +1,9 @@
 """Excel output writer.
 
 Produces the final ``.xlsx`` using :mod:`openpyxl`.  The primary **Results**
-sheet has one row per athlete — identified by the composite key
-``(NAME, ID, COLLEGE)`` — showing GENDER and the summed SCORE, sorted highest
-first.  Two supporting sheets are added:
+sheet has one row per athlete — identified by **BIB NUMBER**, enriched with
+NAME/ID/COLLEGE when a mapping file is supplied — showing GENDER and the summed
+SCORE, sorted highest first.  Supporting sheets are added:
 
 * **Details**  — every individual performance and its score, grouped under the
   athlete it belongs to, so officials can see how each total was built.
@@ -23,6 +23,7 @@ from athletics_scoring.models import (
     AGGREGATE_COLUMNS,
     COLLEGE_COLUMNS,
     OUTPUT_COLUMNS,
+    REJECT_COLUMNS,
     AthleteAggregate,
     CollegeRanking,
     ScoringReport,
@@ -124,8 +125,7 @@ class ExcelWriter:
         headers = ("RANK",) + OUTPUT_COLUMNS
         sheet.append(list(headers))
         for rank, aggregate in enumerate(aggregates, start=1):
-            for result in aggregate.results:
-                row = result.as_output_row()
+            for row in aggregate.detail_rows():
                 sheet.append([rank] + [row[col] for col in OUTPUT_COLUMNS])
         self._style_header(sheet, len(headers), _DETAIL_FILL)
         self._autofit(sheet, headers)
@@ -133,17 +133,7 @@ class ExcelWriter:
 
     def _write_rejects(self, sheet: Worksheet, report: ScoringReport) -> None:
         """Write the rejected-records sheet."""
-        headers = (
-            "ROW",
-            "NAME",
-            "ID",
-            "COLLEGE",
-            "GENDER",
-            "EVENT NAME",
-            "PERFORMANCE TYPE",
-            "RESULT",
-            "REASON",
-        )
+        headers = REJECT_COLUMNS
         sheet.append(list(headers))
         for reject in report.rejected:
             row = reject.as_output_row()
