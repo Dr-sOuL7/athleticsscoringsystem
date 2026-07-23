@@ -53,7 +53,9 @@ It ships with **two interfaces** over the same trusted scoring engine:
 ```
 athleticsscoringsystem/
 ├── main.py                         # CLI entry point (orchestration only)
-├── run_web.py                      # Web app launcher (waitress / dev server)
+├── run_web.py                      # Local web launcher (waitress / dev server)
+├── api/index.py                    # Vercel serverless entrypoint (WSGI app)
+├── vercel.json                     # Vercel build + routing config
 ├── requirements.txt
 ├── README.md
 ├── athletics_scoring/              # The scoring engine (UI-independent)
@@ -69,12 +71,11 @@ athleticsscoringsystem/
 │   ├── writer.py                   # Formatted .xlsx output writer
 │   ├── logging_config.py           # Centralised logging setup
 │   └── build_tables.py             # Build step: workbook -> bundled JSON
-├── webapp/                         # Flask web application (new)
+├── webapp/                         # Flask web application
 │   ├── __init__.py                 # Application factory (create_app)
 │   ├── config.py                   # Env-driven configuration
 │   ├── service.py                  # Adapter: upload -> engine -> view models
-│   ├── cache.py                    # TTL download cache
-│   ├── routes.py                   # HTTP routes (upload/results/download)
+│   ├── routes.py                   # HTTP routes (stateless upload/results)
 │   ├── logging_bootstrap.py        # Web server logging
 │   ├── templates/                  # Jinja2 templates (base/index/results/help)
 │   └── static/                     # style.css, app.js
@@ -145,19 +146,47 @@ python run_web.py --debug          # Flask dev server with auto-reload
 5. **Download** the generated Excel workbook (Results, College Ranking, Details,
    Rejected sheets).
 
+The workbook download is **stateless**: the generated `.xlsx` is embedded in the
+results page as a base64 `data:` link, so there is no second request and no
+server-side state between requests (which is what makes serverless hosting
+reliable).
+
 ### Configuration (environment variables)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ASCORE_MAX_UPLOAD_BYTES` | `16777216` (16 MB) | Max upload size |
-| `ASCORE_RESULT_TTL_SECONDS` | `3600` | How long a download link stays valid |
+| `ASCORE_MAX_UPLOAD_BYTES` | `4194304` (4 MB) | Max upload size (kept under Vercel's ~4.5 MB body cap) |
 | `ASCORE_MAX_PREVIEW_ROWS` | `1000` | Max rows rendered per table (full data is always in the download) |
 | `ASCORE_SECRET_KEY` | `dev-secret-change-me` | Flask secret — **set this in production** |
 
-### Deployment notes
+### Deploy to Vercel
 
-The app is a standard WSGI application (`webapp:create_app()`), served locally by
-**waitress** (cross-platform, used by `run_web.py`). For a public deployment:
+The app runs on **Vercel Hobby** as a single Python (WSGI) function — no code
+changes needed beyond what ships in the repo:
+
+- `api/index.py` exports the Flask `app`.
+- `vercel.json` builds it with `@vercel/python`, bundles the templates, static
+  assets, scoring-table JSON and example files, and routes all paths to the
+  function.
+
+Steps:
+
+1. Push this repo to GitHub.
+2. In Vercel, **Import Project** → select the repo → Deploy (settings are read
+   from `vercel.json`; no build command required).
+3. *(Optional but recommended)* set `ASCORE_SECRET_KEY` in the project's
+   Environment Variables.
+
+**Upload size:** Vercel serverless requests are capped at ~4.5 MB. The app sets
+a 4 MB limit and a client-side guard so oversized files get a clear message
+rather than an opaque platform error — comfortably enough for a typical meet
+(thousands of athletes). For much larger files, add a Vercel Blob direct-upload
+path (a future enhancement).
+
+### Other hosts (traditional WSGI server)
+
+The same app is a standard WSGI application (`webapp:create_app()`), served
+locally by **waitress** (`python run_web.py`). For a non-serverless deployment:
 
 ```bash
 # Linux (gunicorn)
@@ -167,11 +196,9 @@ gunicorn "webapp:create_app()" --bind 0.0.0.0:8000 --workers 3
 waitress-serve --listen=0.0.0.0:8000 --call webapp:create_app
 ```
 
-Put it behind a reverse proxy (nginx/Caddy) for TLS, set `ASCORE_SECRET_KEY`,
-and it runs on any PaaS that supports a WSGI app. Processing is in-memory and
-stateless (no database); downloads are held briefly in a per-process cache — if
-you scale to multiple workers, back that cache with a shared store (e.g. Redis).
-The `ResultCache` interface is intentionally small to make that swap easy.
+Put it behind a reverse proxy (nginx/Caddy) for TLS and set `ASCORE_SECRET_KEY`.
+Processing is fully in-memory and stateless (no database, no shared cache), so
+it scales horizontally without extra infrastructure.
 
 ---
 
