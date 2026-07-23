@@ -8,14 +8,20 @@ scoring engine the CLI uses.  Run with::
 
 from __future__ import annotations
 
+import base64
+import importlib.util
 import io
 import re
 import unittest
 from pathlib import Path
 
+from flask import Flask
+
 from webapp import create_app
 from webapp.config import Config
 from webapp.service import ProcessingError, ScoringService
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 _REPO = Path(__file__).resolve().parent.parent
 
@@ -68,7 +74,8 @@ class TestPages(WebAppTestBase):
         r = self.client.get("/example")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Athlete ranking", r.data)
-        self.assertIn(b"/download/", r.data)
+        # Download is an embedded data: URI, not a stateful /download link.
+        self.assertIn(b'href="data:application/vnd', r.data)
         # The bundled example ships a roster, so the view is enriched.
         self.assertIn(b"Enriched with roster", r.data)
 
@@ -91,18 +98,21 @@ class TestScoringFlow(WebAppTestBase):
         self.assertIn(b"Red College", r.data)
         self.assertIn(b'data-tab="colleges"', r.data)    # college tab appears
 
-    def test_download_returns_xlsx(self):
+    def test_download_is_embedded_and_stateless(self):
+        # The results page embeds the xlsx as a base64 data: URI (no second
+        # request, no server-side state) so it works on serverless hosts.
         r = self.client.get("/example")
-        token = re.search(rb"/download/([0-9a-f]+)", r.data).group(1).decode()
-        d = self.client.get(f"/download/{token}")
-        self.assertEqual(d.status_code, 200)
-        self.assertEqual(d.data[:2], b"PK")  # xlsx is a zip
-        self.assertIn("attachment", d.headers.get("Content-Disposition", ""))
-
-    def test_expired_or_unknown_token_redirects(self):
-        r = self.client.get("/download/deadbeef", follow_redirects=True)
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b"expired", r.data.lower())
+        m = re.search(
+            rb'href="data:application/vnd[^"]+;base64,([^"]+)" download="([^"]+)"',
+            r.data,
+        )
+        self.assertIsNotNone(m, "embedded download data: URI not found")
+        blob = base64.b64decode(m.group(1))
+        self.assertEqual(blob[:2], b"PK")  # decoded xlsx is a zip
+        self.assertTrue(m.group(2).decode().endswith("_scored.xlsx"))
+        # The stateful /download route no longer exists.
+        rules = {str(rule) for rule in self.app.url_map.iter_rules()}
+        self.assertNotIn("/download/<token>", rules)
 
 
 class TestErrorHandling(WebAppTestBase):
@@ -192,6 +202,27 @@ class TestServiceLayer(unittest.TestCase):
         cfg = Config()
         self.assertGreater(cfg.max_upload_bytes, 0)
         self.assertIn(".xlsx", cfg.allowed_extensions)
+
+
+class TestVercelEntrypoint(unittest.TestCase):
+    """The Vercel serverless entrypoint must export a working WSGI app."""
+
+    def _load_entrypoint(self):
+        spec = importlib.util.spec_from_file_location(
+            "vercel_index", _REPO_ROOT / "api" / "index.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_exports_flask_app(self):
+        module = self._load_entrypoint()
+        self.assertIsInstance(module.app, Flask)
+
+    def test_entrypoint_serves_pages(self):
+        client = self._load_entrypoint().app.test_client()
+        self.assertEqual(client.get("/").status_code, 200)
+        self.assertEqual(client.get("/example").status_code, 200)
 
 
 if __name__ == "__main__":
