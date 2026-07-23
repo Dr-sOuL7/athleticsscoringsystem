@@ -70,6 +70,27 @@ class TestPages(WebAppTestBase):
     def test_help_ok(self):
         self.assertEqual(self.client.get("/help").status_code, 200)
 
+    def test_index_offers_sample_downloads_and_generator(self):
+        html = self.client.get("/").data.decode()
+        # The generator UI is present.
+        self.assertIn('id="generator"', html)
+        self.assertIn("generator.js", html)
+        # Both example files are offered as base64 CSV data: links.
+        main = re.search(
+            r'href="data:text/csv;base64,([^"]+)"\s+download="sample_main_results.csv"',
+            html,
+        )
+        roster = re.search(
+            r'href="data:text/csv;base64,([^"]+)"\s+download="sample_roster.csv"',
+            html,
+        )
+        self.assertIsNotNone(main, "main sample download missing")
+        self.assertIsNotNone(roster, "roster sample download missing")
+        main_csv = base64.b64decode(main.group(1)).decode()
+        roster_csv = base64.b64decode(roster.group(1)).decode()
+        self.assertTrue(main_csv.startswith("BIB NUMBER,GENDER,EVENT NAME"))
+        self.assertTrue(roster_csv.startswith("BIB NUMBER,NAME,ID,COLLEGE"))
+
     def test_example_is_enriched(self):
         r = self.client.get("/example")
         self.assertEqual(r.status_code, 200)
