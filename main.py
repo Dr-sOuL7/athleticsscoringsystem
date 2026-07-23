@@ -6,7 +6,11 @@ Usage
 
     python main.py INPUT.xlsx
     python main.py INPUT.csv -o results.xlsx
+    python main.py INPUT.xlsx --mapping athletes.xlsx    # enrich with names
     python main.py INPUT.xlsx --tables data/scoring_tables.json --no-rejects
+
+The main input file is keyed by BIB NUMBER.  An optional ``--mapping`` file
+(BIB NUMBER + NAME/ID/COLLEGE) enriches the output with athlete identity.
 
 The CLI is a *thin* orchestration layer: it wires the loader, scoring engine
 and writer together, and records a full audit trail (input file, athlete
@@ -23,9 +27,11 @@ from pathlib import Path
 
 from athletics_scoring.loader import InputLoader, LoaderError
 from athletics_scoring.logging_config import configure_logging
+from athletics_scoring.mapping import MappingError
 from athletics_scoring.scorer import (
     ScoringEngine,
     aggregate_by_athlete,
+    apply_mapping,
     rank_colleges,
 )
 from athletics_scoring.tables import ScoringTables
@@ -41,7 +47,14 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="athletics-scorer",
         description="Score an athletics meet using the World Athletics tables.",
     )
-    parser.add_argument("input", help="Input file (.xlsx or .csv).")
+    parser.add_argument("input", help="Main scoring file (.xlsx or .csv), keyed by BIB NUMBER.")
+    parser.add_argument(
+        "-m",
+        "--mapping",
+        default=None,
+        help="Optional BIB->identity mapping file (.xlsx/.csv) with "
+        "BIB NUMBER and any of NAME/ID/COLLEGE.",
+    )
     parser.add_argument(
         "-o",
         "--output",
@@ -107,18 +120,28 @@ def run(argv: list[str]) -> int:
         tables.meta.get("event_count_women", "?"),
     )
 
-    # 2) Load input.
+    # 2) Load main input and the optional mapping file.
+    loader = InputLoader()
     try:
-        performances = InputLoader().load(input_path)
+        performances = loader.load(input_path)
     except (LoaderError, ValidationError) as exc:
         _LOG.error("Failed to load input: %s", exc)
         return 2
-    _LOG.info("Athletes read   : %d", len(performances))
+    _LOG.info("Performances read: %d", len(performances))
 
-    # 3) Score, aggregate per athlete (sum of event scores), rank colleges.
+    mapping = None
+    if args.mapping:
+        try:
+            mapping = loader.load_mapping(Path(args.mapping))
+        except (LoaderError, MappingError) as exc:
+            _LOG.error("Failed to load mapping: %s", exc)
+            return 2
+        _LOG.info("Mapping entries : %d (from %s)", len(mapping), args.mapping)
+
+    # 3) Score, aggregate per bib, enrich with the mapping, rank colleges.
     engine = ScoringEngine(tables)
     report = engine.score_all(performances)
-    aggregates = aggregate_by_athlete(report)
+    aggregates = apply_mapping(aggregate_by_athlete(report), mapping)
     colleges = rank_colleges(aggregates)
     _LOG.info("Scored records  : %d", len(report.scored))
     _LOG.info("Distinct athletes: %d", len(aggregates))
