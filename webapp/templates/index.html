@@ -28,7 +28,8 @@
     </div>
     <label class="dropzone" id="dropzone">
       <input type="file" id="file-input" name="file"
-             accept=".csv,.xlsx,.xlsm" required>
+             accept=".csv,.xlsx,.xlsm,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+             required>
       <span class="dropzone-icon">📄</span>
       <span class="dropzone-text" id="dropzone-text">
         <strong>Choose a file</strong> or drag it here
@@ -45,7 +46,7 @@
     </div>
     <label class="dropzone dropzone-secondary" id="dropzone-map">
       <input type="file" id="mapping-input" name="mapping"
-             accept=".csv,.xlsx,.xlsm">
+             accept=".csv,.xlsx,.xlsm,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
       <span class="dropzone-icon">🧾</span>
       <span class="dropzone-text" id="dropzone-map-text">
         <strong>Choose a roster file</strong> or drag it here — or skip this

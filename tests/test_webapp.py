@@ -70,6 +70,16 @@ class TestPages(WebAppTestBase):
     def test_help_ok(self):
         self.assertEqual(self.client.get("/help").status_code, 200)
 
+    def test_file_inputs_accept_csv_mime(self):
+        # Both file pickers must list CSV MIME types (not just the extension)
+        # so browsers/OSes that filter by MIME still let users choose .csv.
+        html = self.client.get("/").data.decode()
+        accepts = re.findall(r'<input type="file"[^>]*accept="([^"]+)"', html)
+        self.assertEqual(len(accepts), 2, "expected two file inputs")
+        for acc in accepts:
+            self.assertIn(".csv", acc)
+            self.assertIn("text/csv", acc)
+
     def test_index_offers_sample_downloads_and_generator(self):
         html = self.client.get("/").data.decode()
         # The generator UI is present.
