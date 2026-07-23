@@ -1,0 +1,11 @@
+# Files not needed by the deployed function (keeps uploads/bundle lean).
+# The runtime only needs data/scoring_tables.json (not the source workbook).
+data/source
+tests
+logs
+examples/example_output.xlsx
+.github
+*.log
+__pycache__
+**/__pycache__
+.venv
