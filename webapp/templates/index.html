@@ -14,7 +14,10 @@
 <section class="card upload-card">
   <form class="upload-form" method="post"
         action="{{ url_for('routes.score') }}"
-        enctype="multipart/form-data">
+        enctype="multipart/form-data"
+        data-max-bytes="{{ max_mb * 1024 * 1024 }}"
+        data-max-mb="{{ max_mb }}">
+    <div class="flash flash-error" id="size-error" role="alert" hidden></div>
 
     <div class="field-label">
       <span class="step-badge">1</span>
