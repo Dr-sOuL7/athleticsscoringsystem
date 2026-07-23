@@ -87,10 +87,29 @@ def _render_outcome(outcome) -> str:
     )
 
 
+_CSV_MIME = "text/csv"
+
+
+def _csv_data_uri(path: Path) -> str | None:
+    """Return a base64 ``data:`` URI for a small bundled CSV, or ``None``.
+
+    Used to offer the ready-made example files as stateless downloads (no extra
+    endpoint or server-side state — safe on serverless hosts).
+    """
+    if not path.exists():
+        return None
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{_CSV_MIME};base64,{b64}"
+
+
 @bp.get("/")
 def index() -> str:
-    """Landing page with the upload form."""
-    return render_template("index.html")
+    """Landing page with the upload form, sample downloads and generator."""
+    return render_template(
+        "index.html",
+        sample_main_uri=_csv_data_uri(_EXAMPLES_DIR / "example_input.csv"),
+        sample_roster_uri=_csv_data_uri(_EXAMPLES_DIR / "example_mapping.csv"),
+    )
 
 
 @bp.get("/help")

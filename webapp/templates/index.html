@@ -64,6 +64,71 @@
   </form>
 </section>
 
+<section class="card demo-card">
+  <h2>New here? Grab sample files</h2>
+  <p class="muted demo-intro">
+    You upload two kinds of file, linked by <strong>bib number</strong>:
+  </p>
+  <div class="demo-relate">
+    <div class="demo-file">
+      <span class="req-tag">required</span>
+      <strong>Results file</strong>
+      <p class="muted">One performance per row — bib, gender, event, type, result.</p>
+    </div>
+    <span class="demo-link" aria-hidden="true">🔗 matched by <code>BIB&nbsp;NUMBER</code></span>
+    <div class="demo-file">
+      <span class="opt-tag">optional</span>
+      <strong>Roster file</strong>
+      <p class="muted">Maps each bib to a name, ID and college to enrich the results.</p>
+    </div>
+  </div>
+
+  <div class="demo-grid">
+    <div class="demo-col">
+      <h3>Ready-made samples</h3>
+      <p class="muted">Download, open them to see the format, then upload above.</p>
+      <div class="gen-downloads">
+        {% if sample_main_uri %}
+        <a class="btn btn-ghost" href="{{ sample_main_uri }}"
+           download="sample_main_results.csv">⬇ Main results <span class="req-tag">required</span></a>
+        {% endif %}
+        {% if sample_roster_uri %}
+        <a class="btn btn-ghost" href="{{ sample_roster_uri }}"
+           download="sample_roster.csv">⬇ Roster <span class="opt-tag">optional</span></a>
+        {% endif %}
+      </div>
+      <p class="muted">These include a couple of intentional error rows so you can see the
+        <strong>Rejected</strong> tab. Prefer an instant demo? Use
+        <em>“Try the example files”</em> above.</p>
+    </div>
+
+    <div class="demo-col" id="generator" data-max-mb="{{ max_mb }}">
+      <h3>Generate a custom sample</h3>
+      <p class="muted">Make a random, valid meet of any size to test the full flow.</p>
+      <div class="gen-controls">
+        <label class="gen-field">Athletes / rows
+          <input type="number" id="gen-rows" min="1" max="2000" value="60" inputmode="numeric">
+        </label>
+        <label class="gen-check">
+          <input type="checkbox" id="gen-roster" checked> Also make a matching roster
+        </label>
+        <button type="button" class="btn btn-primary" id="gen-btn">Generate</button>
+      </div>
+      <div class="gen-output" id="gen-output" hidden>
+        <div class="gen-downloads">
+          <a class="btn btn-primary" id="gen-dl-main" download="sample_main_results.csv">⬇ Main results (CSV)</a>
+          <a class="btn btn-ghost" id="gen-dl-roster" download="sample_roster.csv" hidden>⬇ Roster (CSV)</a>
+        </div>
+        <p class="muted" id="gen-note"></p>
+        <div class="table-wrap"><table class="data-table gen-preview" id="gen-preview"></table></div>
+      </div>
+      <noscript>
+        <p class="muted">The generator needs JavaScript — use the ready-made samples instead.</p>
+      </noscript>
+    </div>
+  </div>
+</section>
+
 <section class="info-grid">
   <div class="card info-card">
     <h2>Results file columns</h2>
@@ -99,4 +164,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='generator.js') }}"></script>
 {% endblock %}
