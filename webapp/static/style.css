@@ -87,6 +87,33 @@ body {
 .roster-note-on { background: #eafaf0; border-color: #bce8cd; color: var(--good); }
 .roster-note-off { background: #eef3fb; border-color: #cfe0f3; color: var(--brand-dark); }
 
+/* ---- Demo / sample-file section ---- */
+.demo-card h2 { margin: 0 0 6px; }
+.demo-card h3 { font-size: 1rem; margin: 0 0 6px; }
+.demo-intro { margin: 0 0 12px; }
+.demo-relate { display: flex; align-items: stretch; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.demo-file { flex: 1 1 240px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fbfcfe; }
+.demo-file strong { display: inline-block; margin-top: 6px; }
+.demo-file p { margin: 4px 0 0; }
+.demo-link { align-self: center; color: var(--ink-soft); font-size: .85rem; white-space: nowrap; }
+.demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.demo-col { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--surface); }
+.gen-downloads { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.gen-downloads .btn { align-items: center; }
+.gen-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 6px 0 4px; }
+.gen-field { display: flex; flex-direction: column; font-size: .85rem; color: var(--ink-soft); font-weight: 600; gap: 4px; }
+.gen-field input { width: 110px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 1rem; }
+.gen-check { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; }
+.gen-output { margin-top: 12px; }
+.gen-preview { font-size: .82rem; }
+.gen-preview th, .gen-preview td { padding: 6px 10px; }
+.btn .req-tag, .btn .opt-tag { margin-left: 8px; }
+
+@media (max-width: 720px) {
+  .demo-grid { grid-template-columns: 1fr; }
+  .demo-link { align-self: flex-start; }
+}
+
 /* ---- Buttons ---- */
 .btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 10px; padding: 11px 18px; font-size: 1rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .15s, box-shadow .15s, transform .02s; }
 .btn:active { transform: translateY(1px); }

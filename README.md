@@ -78,7 +78,7 @@ athleticsscoringsystem/
 │   ├── routes.py                   # HTTP routes (stateless upload/results)
 │   ├── logging_bootstrap.py        # Web server logging
 │   ├── templates/                  # Jinja2 templates (base/index/results/help)
-│   └── static/                     # style.css, app.js
+│   └── static/                     # style.css, app.js, generator.js
 ├── data/
 │   ├── source/WA_Scoring_Tables_2025.xlsx   # Original World Athletics workbook
 │   └── scoring_tables.json         # Compact bundled tables (generated)
@@ -122,7 +122,16 @@ python run_web.py
 ```
 
 Then open **http://127.0.0.1:8000** in your browser. Click **“Try the example
-file”** to see it work immediately, or upload your own spreadsheet.
+files”** to see it work immediately, or upload your own spreadsheet.
+
+The landing page also helps first-time users get started:
+
+- a short explainer of how the two files relate (required **Results file** and
+  optional **Roster file**, matched by `BIB NUMBER`);
+- **ready-made sample downloads** for both files;
+- a **client-side sample generator** — enter a row count, optionally include a
+  matching roster, and download a realistic, valid random meet as CSV. It runs
+  entirely in the browser (no server call), so it's Vercel-safe.
 
 Options:
 
